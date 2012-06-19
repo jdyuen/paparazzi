@@ -158,6 +158,17 @@
 #define PPRZ_PAYLOAD_LEN 256
 #define PPRZ_DATA_OFFSET 2
 
+/** Receiving ocean optics messages */
+#define OO_STX  0x02
+#define OO_EB1 0xFF
+#define OO_EB2 0xFD
+#define OO_UNINIT 0
+#define OO_GOT_STX 1
+#define OO_GOT_EB1 2
+#define OO_GOT_PAYLOAD 3
+#define OO_PAYLOAD_LEN 8000
+#define OO_DATA_OFFSET 2
+
 /** logging messages **/
 #define LOG_DATA_OFFSET 7
 #define MSG_SIZE 256
@@ -182,6 +193,7 @@ unsigned int getclock(void);
 void log_payload(int len, unsigned char source, unsigned int timestamp);
 void log_xbee(unsigned char c, unsigned char source);
 void log_pprz(unsigned char c, unsigned char source);
+void log_oo(unsigned char c, unsigned char source);
 int do_log(void);
 
 DirList list;
@@ -191,13 +203,17 @@ EmbeddedFile filew;
 
 unsigned char xbeel_payload[XBEE_PAYLOAD_LEN];
 unsigned char pprzl_payload[PPRZ_PAYLOAD_LEN];
+unsigned char oo_payload[OO_PAYLOAD_LEN];
 volatile unsigned char xbeel_payload_len;
 volatile unsigned char pprzl_payload_len;
+volatile unsigned char oo_payload_len;
 unsigned char xbeel_error;
 unsigned char pprzl_error;
+unsigned char oo_error;
 unsigned char log_buffer[MSG_SIZE]  __attribute__ ((aligned));
 static unsigned int xbeel_timestamp = 0;
 static unsigned int pprzl_timestamp = 0;
+static unsigned int oo_timestamp = 0;
 unsigned int nb_messages = 0;
 unsigned int nb_fail_write = 0;
 int bytes = 0;
@@ -338,30 +354,31 @@ void log_xbee(unsigned char c, unsigned char source)
 }
 
 /* logging an Ocean Optics USB4000 */
-void oo_pprz(unsigned char c, unsigned char source)
+void log_oo(unsigned char c, unsigned char source)
 {
-  static unsigned char oo_status = UNINIT;
+  static unsigned char oo_status = OO_UNINIT;
   static unsigned char payload_idx, i;
 
   switch (oo_status) {
   case OO_UNINIT:
-    if (c == STX)
+    if (c == OO_STX)
 // serial receive broken with MAX
 #ifndef USE_MAX11040
       oo_timestamp = getclock();
 #endif
       // oo_payload_len = 0;
-      oo_payload_idx = 0;
+      payload_idx = 0;
       oo_status++;
     break;
-  case OO_GOT_LENGTH:
-    oo_payload[oo_payload_idx] = c;
+  case OO_GOT_STX:
+    oo_payload[payload_idx] = c;
     payload_idx++;
     if (c == OO_EB1)
       oo_status++;
     break;
   case OO_GOT_EB1:
-    oo_payload[oo_payload_idx] = c;
+    oo_payload[payload_idx] = c;
+    payload_idx++;
     if (c == OO_EB2)
       oo_status++;
     else
@@ -369,21 +386,22 @@ void oo_pprz(unsigned char c, unsigned char source)
     break;
   case OO_GOT_PAYLOAD:
     /* copy the pprz message to the logger buffer */
-    for (i = 0; i < pprzl_payload_len; i++) {
-      log_buffer[i+LOG_DATA_OFFSET] = pprzl_payload[i];
+    oo_payload_len = payload_idx + 1;
+    for (i = 0; i < oo_payload_len; i++) {
+      log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
     }
 // serial receive broken with MAX
 #ifndef USE_MAX11040
-    log_payload(pprzl_payload_len, source, pprzl_timestamp);
+    log_payload(oo_payload_len, source, oo_timestamp);
 #endif
     LED_TOGGLE(3);
     goto restart;
   }
   return;
  error:
-  pprzl_error++;
+  oo_error++;
  restart:
-  pprzl_status = UNINIT;
+  oo_status = OO_UNINIT;
   return;
 }
 
@@ -502,6 +520,9 @@ int do_log(void)
         {
 //			LED_TOGGLE(3);
 			inc = Uart0Getch();
+#ifdef LOG_OO
+            log_oo(inc, LOG_SOURCE_UART0);
+#else
 #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART0);
 #else
@@ -509,6 +530,7 @@ int do_log(void)
             log_pprz(inc, LOG_SOURCE_UART0);
 #else
 #error no log transport protocol selected
+#endif
 #endif
 #endif
         }
@@ -519,6 +541,9 @@ int do_log(void)
         {
 //			LED_TOGGLE(3);
 			inc = Uart1Getch();
+#ifdef LOG_OO
+            log_oo(inc, LOG_SOURCE_UART0);
+#else
 #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART1);
 #else
@@ -526,6 +551,7 @@ int do_log(void)
             log_pprz(inc, LOG_SOURCE_UART1);
 #else
 #error no log transport protocol selected
+#endif
 #endif
 #endif
         }
