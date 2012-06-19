@@ -391,6 +391,60 @@ void log_pprz(unsigned char c, unsigned char source)
   return;
 }
 
+void log_pprz(unsigned char c, unsigned char source)
+{
+  static unsigned char pprzl_status = UNINIT;
+  static unsigned char _ck_a, _ck_b, payload_idx, i;
+
+  switch (pprzl_status) {
+  case UNINIT:
+    if (c == STX)
+// serial receive broken with MAX
+#ifndef USE_MAX11040
+      pprzl_timestamp = getclock();
+#endif
+      pprzl_status++;
+    break;
+  case GOT_STX:
+    pprzl_payload_len = c-4; /* Counting STX, LENGTH and CRC1 and CRC2 */
+    _ck_a = _ck_b = c;
+    pprzl_status++;
+    payload_idx = 0;
+    break;
+  case GOT_LENGTH:
+    pprzl_payload[payload_idx] = c;
+    _ck_a += c; _ck_b += _ck_a;
+    payload_idx++;
+    if (payload_idx == pprzl_payload_len)
+      pprzl_status++;
+    break;
+  case GOT_PAYLOAD:
+    if (c != _ck_a)
+      goto error;
+    pprzl_status++;
+    break;
+  case GOT_CRC1:
+    if (c != _ck_b)
+      goto error;
+    /* copy the pprz message to the logger buffer */
+    for (i = 0; i < pprzl_payload_len; i++) {
+      log_buffer[i+LOG_DATA_OFFSET] = pprzl_payload[i];
+    }
+// serial receive broken with MAX
+#ifndef USE_MAX11040
+    log_payload(pprzl_payload_len, source, pprzl_timestamp);
+#endif
+    LED_TOGGLE(3);
+    goto restart;
+  }
+  return;
+ error:
+  pprzl_error++;
+ restart:
+  pprzl_status = UNINIT;
+  return;
+}
+
 int do_log(void)
 {
     unsigned int count;
