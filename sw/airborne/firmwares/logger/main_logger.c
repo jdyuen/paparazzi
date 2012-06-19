@@ -337,41 +337,37 @@ void log_xbee(unsigned char c, unsigned char source)
   return;
 }
 
-void log_pprz(unsigned char c, unsigned char source)
+/* logging an Ocean Optics USB4000 */
+void oo_pprz(unsigned char c, unsigned char source)
 {
-  static unsigned char pprzl_status = UNINIT;
-  static unsigned char _ck_a, _ck_b, payload_idx, i;
+  static unsigned char oo_status = UNINIT;
+  static unsigned char payload_idx, i;
 
-  switch (pprzl_status) {
-  case UNINIT:
+  switch (oo_status) {
+  case OO_UNINIT:
     if (c == STX)
 // serial receive broken with MAX
 #ifndef USE_MAX11040
-      pprzl_timestamp = getclock();
+      oo_timestamp = getclock();
 #endif
-      pprzl_status++;
+      // oo_payload_len = 0;
+      oo_payload_idx = 0;
+      oo_status++;
     break;
-  case GOT_STX:
-    pprzl_payload_len = c-4; /* Counting STX, LENGTH and CRC1 and CRC2 */
-    _ck_a = _ck_b = c;
-    pprzl_status++;
-    payload_idx = 0;
-    break;
-  case GOT_LENGTH:
-    pprzl_payload[payload_idx] = c;
-    _ck_a += c; _ck_b += _ck_a;
+  case OO_GOT_LENGTH:
+    oo_payload[oo_payload_idx] = c;
     payload_idx++;
-    if (payload_idx == pprzl_payload_len)
-      pprzl_status++;
+    if (c == OO_EB1)
+      oo_status++;
     break;
-  case GOT_PAYLOAD:
-    if (c != _ck_a)
-      goto error;
-    pprzl_status++;
+  case OO_GOT_EB1:
+    oo_payload[oo_payload_idx] = c;
+    if (c == OO_EB2)
+      oo_status++;
+    else
+      oo_status--;
     break;
-  case GOT_CRC1:
-    if (c != _ck_b)
-      goto error;
+  case OO_GOT_PAYLOAD:
     /* copy the pprz message to the logger buffer */
     for (i = 0; i < pprzl_payload_len; i++) {
       log_buffer[i+LOG_DATA_OFFSET] = pprzl_payload[i];
