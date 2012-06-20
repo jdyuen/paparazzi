@@ -545,7 +545,7 @@ int do_log(void)
 //			LED_TOGGLE(LED_GREEN);
 			inc = Uart1Getch();
 #ifdef LOG_OO
-            log_oo(inc, LOG_SOURCE_UART0);
+            log_oo(inc, LOG_SOURCE_UART1);
 #else
 #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART1);
