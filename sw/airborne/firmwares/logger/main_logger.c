@@ -624,9 +624,9 @@ int main(void)
 
   while(1)
   {
-    // LED_ON(2);
+    LED_ON(2);
     logstatus = do_log();
-    // LED_OFF(2);
+    LED_OFF(2);
 
     if (logstatus != 0) {
       while(1) {
