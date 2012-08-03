@@ -595,7 +595,7 @@ int do_log(void)
       }
   #endif
       temp = 0;
-      while (Uart0ChAvailable() && (temp++ < 256))
+      while (Uart0ChAvailable() && (temp++ < 128))
       {
 //		LED_TOGGLE(3);
 			inc = Uart0Getch();
