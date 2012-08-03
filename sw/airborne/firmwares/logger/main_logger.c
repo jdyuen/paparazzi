@@ -160,13 +160,16 @@
 
 /** Receiving ocean optics messages */
 #define OO_SAMPLE 'S'
-#define OO_STX  0x02
+#define OO_VERSION 'v'
+#define OO_ACK 0x06
+#define OO_STX 0x02
 #define OO_EB1 0xFF
 #define OO_EB2 0xFD
 #define OO_UNINIT 0
-#define OO_GOT_STX 1
-#define OO_GOT_EB1 2
-#define OO_GOT_PAYLOAD 3
+#define OO_INIT 1
+#define OO_GOT_STX 2
+#define OO_GOT_EB1 3
+#define OO_GOT_PAYLOAD 4
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -174,7 +177,7 @@
 // #if LOG_OO_0
 // #if UART_RX_BUFFER_SIZE
 // #undef UART_RX_BUFFER_SIZE
-// #define UART_RX_BUFFER_SIZE 4000
+// #define UART_RX_BUFFER_SIZE 8000
 // #warning Increasing UART rx buffer size
 // #endif
 // #endif
@@ -201,9 +204,10 @@ void set_filename(unsigned int local, char* name);
 unsigned char checksum(unsigned char start, unsigned char* data, int length);
 unsigned int getclock(void);
 void log_payload(int len, unsigned char source, unsigned int timestamp);
+void oo_log_payload(int len, unsigned char source, unsigned int timestamp);
 void log_xbee(unsigned char c, unsigned char source);
 void log_pprz(unsigned char c, unsigned char source);
-int log_oo(unsigned char c, unsigned char source);
+char log_oo(unsigned char c, unsigned char source);
 int do_log(void);
 
 DirList list;
@@ -216,7 +220,7 @@ unsigned char pprzl_payload[PPRZ_PAYLOAD_LEN];
 unsigned char oo_payload[OO_PAYLOAD_LEN];
 volatile unsigned char xbeel_payload_len;
 volatile unsigned char pprzl_payload_len;
-volatile unsigned char oo_payload_len;
+volatile unsigned int oo_payload_len;
 unsigned char xbeel_error;
 unsigned char pprzl_error;
 unsigned char oo_error;
@@ -364,20 +368,62 @@ void log_xbee(unsigned char c, unsigned char source)
   return;
 }
 
+void oo_log_payload(int len, unsigned char source, unsigned int timestamp)
+{
+  unsigned char chk;
+
+  /* start delimiter */
+  oo_log_buffer[0] = STX;
+
+  /* length is just payload */
+  oo_log_buffer[1] = len & 0xFF;
+
+  /* source */
+  oo_log_buffer[2] = source;
+
+  /* add a 32bit timestamp */
+  oo_log_buffer[3] = (timestamp) & 0xFF;       // LSB first
+  oo_log_buffer[4] = (timestamp >> 8)  & 0xFF;
+  oo_log_buffer[5] = (timestamp >> 16) & 0xFF;
+  oo_log_buffer[6] = (timestamp >> 24) & 0xFF;
+
+  /* data is already written */
+
+  /* calculate checksum over start+length+timestamp+data */
+  // oo_log_buffer[LOG_DATA_OFFSET+len] = checksum(0, &oo_log_buffer[1], LOG_DATA_OFFSET+len-1);
+
+  /* write data, start+length+timestamp+data+checksum */
+  chk = file_write(&filew, LOG_DATA_OFFSET+len+1, oo_log_buffer);
+
+  // if (len != chk)
+  // {
+  //   nb_fail_write++;
+  // }
+
+  bytes += chk;
+  nb_messages++;
+//  dl_parse_msg();
+}
+
 /* logging an Ocean Optics USB4000 */
-int log_oo(unsigned char c, unsigned char source)
+char log_oo(unsigned char c, unsigned char source)
 {
   static unsigned char oo_status = OO_UNINIT;
-  static unsigned char payload_idx, i;
+  static unsigned int payload_idx, i;
   switch (oo_status) {
   case OO_UNINIT:
-    if (c == OO_STX)
-      // oo_payload_len = 0;
-      payload_idx = 0;
+    if (c == OO_ACK)
       oo_status++;
     break;
+  case OO_INIT:
+    if (c == OO_STX) {
+      oo_payload_len = 0;
+      payload_idx = 0;
+      oo_timestamp = getclock();
+      oo_status++;
+    }
+    break;
   case OO_GOT_STX:
-    oo_timestamp = getclock();
     oo_payload[payload_idx] = c;
     payload_idx++;
     if (c == OO_EB1)
@@ -386,24 +432,35 @@ int log_oo(unsigned char c, unsigned char source)
   case OO_GOT_EB1:
     oo_payload[payload_idx] = c;
     payload_idx++;
-    if (c == OO_EB2)
+    if (c == OO_EB2) {
       oo_status++;
+      oo_payload_len = payload_idx + 1;
+      for (i = 0; i < oo_payload_len; i++) {
+      oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
+      // Uart0Transmit(oo_log_buffer[i+LOG_DATA_OFFSET]);
+      }
+      oo_log_payload(oo_payload_len, source, oo_timestamp);
+      LED_TOGGLE(2);
+      goto restart;
+    }
     else
       oo_status--;
     break;
-  case OO_GOT_PAYLOAD:
-    /* copy the pprz message to the logger buffer */
-    oo_payload_len = payload_idx + 1;
-    for (i = 0; i < oo_payload_len; i++) {
-      oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
-    }
+  // case OO_GOT_PAYLOAD:
+  //   /* copy the pprz message to the logger buffer */
+  //   oo_payload_len = payload_idx + 1;
+  //   for (i = 0; i < oo_payload_len; i++) {
+  //     oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
+  //   }
 // serial receive broken with MAX
-#ifndef USE_MAX11040
-    log_payload(oo_payload_len, source, oo_timestamp);
-#endif
-    LED_TOGGLE(3);
-    goto restart;
+// #ifndef USE_MAX11040
+    // oo_log_payload(oo_payload_len, source, oo_timestamp);
+// #endif
+    // LED_TOGGLE(3);
+    // goto restart;
   }
+  // Uart0Transmit(payload_idx);
+  // Uart0Transmit(oo_payload[payload_idx]);
   return oo_status;
  error:
   oo_error++;
@@ -526,32 +583,51 @@ int do_log(void)
   #ifdef LOG_OO_0
       static unsigned char oo_init = 0;
       if (oo_init == 0) {
+        Uart0Transmit(OO_VERSION);
+        oo_init = -1;
+      }
+      if (oo_init == 1) {
         Uart0Transmit(OO_SAMPLE);
-        LED_TOGGLE(3);
-        sys_time_usleep(100000);
+        oo_init = -1;
+        // LED_TOGGLE(2);
+        // sys_time_usleep(1000000);
         // oo_init++;
       }
   #endif
-//       temp = 0;
-//       while (Uart0ChAvailable() && (temp++ < 128))
-//       {
-// //		LED_TOGGLE(3);
-// 			inc = Uart0Getch();
-//   #ifdef LOG_OO_0
-//           LED_TOGGLE(2);
-//           oo_init = log_oo(inc, LOG_SOURCE_UART0);
-//   #else
-//   #ifdef LOG_XBEE
-//             log_xbee(inc, LOG_SOURCE_UART0);
-//   #else
-//   #ifdef LOG_PPRZ
-//             log_pprz(inc, LOG_SOURCE_UART0);
-//   #else
-//   #error no log transport protocol selected UART0
-//   #endif
-//   #endif
-//   #endif
-//         }
+      temp = 0;
+      while (Uart0ChAvailable() && (temp++ < 256))
+      {
+//		LED_TOGGLE(3);
+			inc = Uart0Getch();
+  #ifdef LOG_OO_0
+          LED_TOGGLE(3);
+          oo_init = log_oo(inc, LOG_SOURCE_UART0);
+          // if (oo_init == 0)
+          //   Uart0Transmit('0');
+          // else if (oo_init == 1)
+          //   Uart0Transmit('1');
+          // else if (oo_init == 2)
+          //   Uart0Transmit('2');
+          // else if (oo_init == 3)
+          //   Uart0Transmit('3');
+          // else
+          //   Uart0Transmit('x');
+//           #define OO_UNINIT 0
+// #define OO_GOT_STX 1
+// #define OO_GOT_EB1 2
+// #define OO_GOT_PAYLOAD 3
+  #else
+  #ifdef LOG_XBEE
+            log_xbee(inc, LOG_SOURCE_UART0);
+  #else
+  #ifdef LOG_PPRZ
+            log_pprz(inc, LOG_SOURCE_UART0);
+  #else
+  #error no log transport protocol selected UART0
+  #endif
+  #endif
+  #endif
+        }
 #endif
 // #ifdef USE_UART1
 //         temp = 0;
@@ -628,10 +704,15 @@ int main(void)
     logstatus = do_log();
     LED_OFF(2);
 
+    /* if there is an error initializing the file system (ex. No SD card)
+    flash the LEDs angrily*/
     if (logstatus != 0) {
+      LED_ON(2);
+      LED_OFF(3);
       while(1) {
         sys_time_usleep(100000);
         LED_TOGGLE(3);
+        LED_TOGGLE(2);
       }
     }
 
