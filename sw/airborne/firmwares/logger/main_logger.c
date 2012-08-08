@@ -163,6 +163,7 @@
 #define OO_VERSION 'v'
 #define OO_ACK 0x06
 #define OO_STX 0x02
+#define OO_START 0x98
 #define OO_EB1 0xFF
 #define OO_EB2 0xFD
 #define OO_UNINIT 0
@@ -373,10 +374,11 @@ void oo_log_payload(int len, unsigned char source, unsigned int timestamp)
   unsigned char chk;
 
   /* start delimiter */
-  oo_log_buffer[0] = STX;
+  oo_log_buffer[0] = OO_START;
 
   /* length is just payload */
-  oo_log_buffer[1] = len & 0xFF;
+  // oo_log_buffer[1] = len & 0xFF; //need two bytes to store length
+  oo_log_buffer[1] = OO_START;
 
   /* source */
   oo_log_buffer[2] = source;
@@ -629,27 +631,27 @@ int do_log(void)
   #endif
         }
 #endif
-// #ifdef USE_UART1
-//         temp = 0;
-//         while (Uart1ChAvailable() && (temp++ < 128))
-//         {
-// //			LED_TOGGLE(3);
-// 			inc = Uart1Getch();
-//   #ifdef LOG_OO_1
-//             log_oo(inc, LOG_SOURCE_UART1);
-//   #else
-//   #ifdef LOG_XBEE
-//             log_xbee(inc, LOG_SOURCE_UART1);
-//   #else
-//   #ifdef LOG_PPRZ
-//             log_pprz(inc, LOG_SOURCE_UART1);
-//   #else
-//   #error no log transport protocol selected UART1
-//   #endif
-//   #endif
-//   #endif
-//         }
-// #endif
+#ifdef USE_UART1
+        temp = 0;
+        while (Uart1ChAvailable() && (temp++ < 128))
+        {
+//			LED_TOGGLE(3);
+			inc = Uart1Getch();
+  #ifdef LOG_OO_1
+            log_oo(inc, LOG_SOURCE_UART1);
+  #else
+  #ifdef LOG_XBEE
+            log_xbee(inc, LOG_SOURCE_UART1);
+  #else
+  #ifdef LOG_PPRZ
+            log_pprz(inc, LOG_SOURCE_UART1);
+  #else
+  #error no log transport protocol selected UART1
+  #endif
+  #endif
+  #endif
+        }
+#endif
     }
     LED_OFF(3);
 
