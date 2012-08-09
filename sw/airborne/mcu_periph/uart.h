@@ -33,7 +33,7 @@
 #include "mcu_periph/uart_arch.h"
 #include "std.h"
 
-#define UART_RX_BUFFER_SIZE 128
+#define UART_RX_BUFFER_SIZE 256
 #define UART_TX_BUFFER_SIZE 128
 #define UART_DEV_NAME_SIZE 16
 
