@@ -369,6 +369,7 @@ void log_xbee(unsigned char c, unsigned char source)
   return;
 }
 
+/** Parsing frame data from oo and copy the payload to the log buffer */
 void oo_log_payload(int len, unsigned char source, unsigned int timestamp)
 {
   unsigned char chk;
@@ -414,10 +415,10 @@ char log_oo(unsigned char c, unsigned char source)
   static unsigned int payload_idx, i;
   switch (oo_status) {
   case OO_UNINIT:
-    if (c == OO_ACK)
+    if (c == OO_ACK) //wait for ACK from version request
       oo_status++;
     break;
-  case OO_INIT:
+  case OO_INIT: //wait for STX - data will follow
     if (c == OO_STX) {
       oo_payload_len = 0;
       payload_idx = 0;
@@ -425,7 +426,7 @@ char log_oo(unsigned char c, unsigned char source)
       oo_status++;
     }
     break;
-  case OO_GOT_STX:
+  case OO_GOT_STX: //everything else is data until end bits
     oo_payload[payload_idx] = c;
     payload_idx++;
     if (c == OO_EB1)
@@ -582,14 +583,14 @@ int do_log(void)
 
 
 #ifdef USE_UART0
-  #ifdef LOG_OO_0
+  #if LOG_OO_0
       static unsigned char oo_init = 0;
       if (oo_init == 0) {
-        Uart0Transmit(OO_VERSION);
+        Uart0Transmit(OO_VERSION); //will reply with ACK if ready
         oo_init = -1;
       }
       if (oo_init == 1) {
-        Uart0Transmit(OO_SAMPLE);
+        Uart0Transmit(OO_SAMPLE); //tell oo to collect data
         oo_init = -1;
         // LED_TOGGLE(2);
         // sys_time_usleep(1000000);
@@ -601,8 +602,8 @@ int do_log(void)
       {
 //		LED_TOGGLE(3);
 			inc = Uart0Getch();
-  #ifdef LOG_OO_0
-          LED_TOGGLE(3);
+  #if LOG_OO_0
+          // LED_TOGGLE(3);
           oo_init = log_oo(inc, LOG_SOURCE_UART0);
           // if (oo_init == 0)
           //   Uart0Transmit('0');
@@ -614,10 +615,6 @@ int do_log(void)
           //   Uart0Transmit('3');
           // else
           //   Uart0Transmit('x');
-//           #define OO_UNINIT 0
-// #define OO_GOT_STX 1
-// #define OO_GOT_EB1 2
-// #define OO_GOT_PAYLOAD 3
   #else
   #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART0);
@@ -632,13 +629,24 @@ int do_log(void)
         }
 #endif
 #ifdef USE_UART1
+  #if LOG_OO_1
+        static unsigned char oo_init = 0;
+        if (oo_init == 0) {
+          Uart1Transmit(OO_VERSION); //will reply with ACK if ready
+          oo_init = -1;
+        }
+        if (oo_init == 1) {
+          Uart1Transmit(OO_SAMPLE); //tell oo to collect data
+          oo_init = -1;
+        }
+  #endif
         temp = 0;
         while (Uart1ChAvailable() && (temp++ < 128))
         {
 //			LED_TOGGLE(3);
 			inc = Uart1Getch();
-  #ifdef LOG_OO_1
-            log_oo(inc, LOG_SOURCE_UART1);
+  #if LOG_OO_1
+            oo_init = log_oo(inc, LOG_SOURCE_UART1);
   #else
   #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART1);
