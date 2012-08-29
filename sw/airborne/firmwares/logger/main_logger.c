@@ -161,6 +161,8 @@
 /** Receiving ocean optics messages */
 #define OO_SAMPLE 'S'
 #define OO_VERSION 'v'
+#define OO_INTSET 'I'
+#define OO_INTTIME 100 //integration time in ms
 #define OO_ACK 0x06
 #define OO_STX 0x02
 #define OO_START 0x98
@@ -168,9 +170,10 @@
 #define OO_EB2 0xFD
 #define OO_UNINIT 0
 #define OO_INIT 1
-#define OO_GOT_STX 2
-#define OO_GOT_EB1 3
-#define OO_GOT_PAYLOAD 4
+#define OO_GOT_ITIME 2
+#define OO_GOT_STX 3
+#define OO_GOT_EB1 4
+#define OO_GOT_PAYLOAD 5
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -418,7 +421,11 @@ char log_oo(unsigned char c, unsigned char source)
     if (c == OO_ACK) //wait for ACK from version request
       oo_status++;
     break;
-  case OO_INIT: //wait for STX - data will follow
+  case OO_INIT:
+    if (c == OO_ACK) //wait for ACK from integration time set
+      oo_status++;
+    break;
+  case OO_GOT_ITIME: //wait for STX - data will follow
     if (c == OO_STX) {
       oo_payload_len = 0;
       payload_idx = 0;
@@ -468,7 +475,7 @@ char log_oo(unsigned char c, unsigned char source)
  error:
   oo_error++;
  restart:
-  oo_status = OO_UNINIT;
+  oo_status = OO_GOT_ITIME;
   return oo_status;
 }
 
@@ -584,12 +591,21 @@ int do_log(void)
 
 #ifdef USE_UART0
   #if LOG_OO_0
-      static unsigned char oo_init = 0;
-      if (oo_init == 0) {
+      static unsigned char oo_init = UNINIT;
+      if (oo_init == OO_UNINIT) {
         Uart0Transmit(OO_VERSION); //will reply with ACK if ready
         oo_init = -1;
       }
-      if (oo_init == 1) {
+      if (oo_init == OO_INIT) {
+        Uart0Transmit(OO_INTSET); //set the spectrometer integration time
+        unsigned int intTime = OO_INTTIME;
+        unsigned char timeLow,timeHigh;
+        timeLow = (char)intTime;
+        timeHigh = (char)(intTime >> 8);
+        Uart0Transmit(timeHigh);
+        Uart0Transmit(timeLow);
+      }
+      if (oo_init == OO_GOT_ITIME) {
         Uart0Transmit(OO_SAMPLE); //tell oo to collect data
         oo_init = -1;
         // LED_TOGGLE(2);
@@ -630,13 +646,32 @@ int do_log(void)
 #endif
 #ifdef USE_UART1
   #if LOG_OO_1
-        static unsigned char oo_init = 0;
-        if (oo_init == 0) {
+        static unsigned char oo_init = UNINIT;
+        static unsigned int transmit_timestamp = 0;
+        static unsigned int transmit_delta;
+
+        transmit_delta = getclock() - transmit_timestamp;
+        //retry every second if no response
+        if (oo_init == OO_UNINIT && transmit_delta > 20000) {
           Uart1Transmit(OO_VERSION); //will reply with ACK if ready
+          transmit_timestamp = getclock();
+          // oo_init = -1; //wait for reply before transmiting
+        }
+        if (oo_init == OO_INIT) {
+          sys_time_usleep(10000);
+          Uart1Transmit(OO_INTSET); //set the spectrometer integration time
+          unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
+          unsigned char timeLow,timeHigh;
+          timeLow = (char)intTime;
+          timeHigh = (char)(intTime >> 8);
+          Uart1Transmit(timeHigh);
+          Uart1Transmit(timeLow);
+          // transmit_timestamp = getclock();
           oo_init = -1;
         }
-        if (oo_init == 1) {
+        if (oo_init == OO_GOT_ITIME) {
           Uart1Transmit(OO_SAMPLE); //tell oo to collect data
+          // transmit_timestamp = getclock();
           oo_init = -1;
         }
   #endif
