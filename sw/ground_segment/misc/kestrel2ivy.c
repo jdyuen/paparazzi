@@ -34,6 +34,13 @@
  * flying aircraft, which integrates them into the log file, as long as the
  * aircraft sends its alive message.
  *
+ * Commands: (follow with carriage return)
+ * O -- single string of real-time data with no units attached
+ * P -- real-time string (updated at 1 Hz) of the same measurements
+ * S -- full string of all the measurements, including units
+ * B -- data dump of all logged data in csv
+ * i? -- calibration, settings and status information
+ *
  * Useful links:
  * - <a href="http://www.nkhome.com/kestrel/kestrel-4500</a>
  */
