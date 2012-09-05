@@ -173,11 +173,12 @@
 #define OO_UNINIT 0
 #define OO_INIT 1
 #define OO_GOT_ITIME 2
-// #define OO_ENABLED_CHKSUM 3
-#define OO_SET_TRIGGER 3
-#define OO_GOT_STX 4
-#define OO_GOT_EB1 5
+#define OO_ENABLED_CHKSUM 3
+#define OO_READY_SAMPLE 4
+#define OO_GOT_STX 5
 #define OO_GOT_PAYLOAD 6
+#define OO_GOT_CHK_A 7
+#define OO_SAVE_DATA 8
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -419,7 +420,9 @@ void oo_log_payload(int len, unsigned char source, unsigned int timestamp)
 char log_oo(unsigned char c, unsigned char source)
 {
   static unsigned char oo_status = OO_UNINIT;
-  static unsigned int payload_idx, i;
+  static unsigned int payload_idx, i, oo_chk_total, oo_chksum;
+  static unsigned char oo_chk_a, oo_chk_b;
+
   switch (oo_status) {
   case OO_UNINIT:
     if (c == OO_ACK) //wait for ACK from version request
@@ -432,13 +435,18 @@ char log_oo(unsigned char c, unsigned char source)
       oo_status = OO_UNINIT;
     break;
   case OO_GOT_ITIME:
+    if (c == OO_ACK)
+      oo_status++;
+    break;
+  case OO_ENABLED_CHKSUM:
     if (c == OO_ACK) //wait for ACK from checksum enable
       oo_status++;
     break;
-  case OO_SET_TRIGGER: //wait for STX - data will follow
+  case OO_READY_SAMPLE: //wait for STX - data will follow
     if (c == OO_STX) {
       oo_payload_len = 0;
       payload_idx = 0;
+      oo_chk_total = 0;
       oo_timestamp = getclock();
       oo_status++;
     }
@@ -447,58 +455,47 @@ char log_oo(unsigned char c, unsigned char source)
     break;
   case OO_GOT_STX: //everything else is data until end bits
     oo_payload[payload_idx] = c;
-    payload_idx++;
     if (c == OO_EB2) {
-      if (oo_payload[payload_idx-2] == OO_EB1) {
-        oo_payload_len = payload_idx + 1;
-        for (i = 0; i < oo_payload_len; i++) {
-          oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
-          // Uart0Transmit(oo_log_buffer[i+LOG_DATA_OFFSET]);
-        }
-        oo_log_payload(oo_payload_len, source, oo_timestamp);
-        LED_TOGGLE(2);
-        goto restart;        
+      if (oo_payload[payload_idx-1] == OO_EB1) {
+        oo_status++;
+        // oo_payload_len = payload_idx;
+        // for (i = 0; i < oo_payload_len; i++) {
+        //   oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
+        // }
+        // oo_log_payload(oo_payload_len, source, oo_timestamp);
+        // LED_TOGGLE(2);
+        // goto restart;       
       }
-      // oo_status++;
     }
+    payload_idx++;
     break;
-  // case OO_GOT_EB1:
-  //   oo_payload[payload_idx] = c;
-  //   payload_idx++;
-  //   if (c == OO_EB2) {
-  //     oo_status++;
-  //     oo_payload_len = payload_idx + 1;
-  //     for (i = 0; i < oo_payload_len; i++) {
-  //     oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
-  //     // Uart0Transmit(oo_log_buffer[i+LOG_DATA_OFFSET]);
-  //     }
-  //     oo_log_payload(oo_payload_len, source, oo_timestamp);
-  //     LED_TOGGLE(2);
-  //     goto restart;
-  //   }
-  //   else
-  //     oo_status--;
-  //   break;
-  // case OO_GOT_PAYLOAD:
-  //   /* copy the pprz message to the logger buffer */
-  //   oo_payload_len = payload_idx + 1;
-  //   for (i = 0; i < oo_payload_len; i++) {
-  //     oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
-  //   }
-// serial receive broken with MAX
-// #ifndef USE_MAX11040
-    // oo_log_payload(oo_payload_len, source, oo_timestamp);
-// #endif
-    // LED_TOGGLE(3);
-    // goto restart;
+  case OO_GOT_PAYLOAD:
+    // oo_chk_a = c;
+    oo_payload[payload_idx] = c;
+    payload_idx++;
+    oo_status++;
+    break;
+  case OO_GOT_CHK_A:
+    // oo_chk_b = c;
+    oo_payload[payload_idx] = c;
+    payload_idx++;
+    // oo_chksum = (oo_chk_a << 8) + oo_chk_b;
+    // if (oo_chksum != oo_chk_total)
+    //   goto error;
+    /* copy the OO message to the logger buffer */
+    oo_payload_len = payload_idx;
+    for (i = 0; i < oo_payload_len; i++) {
+      oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
+    }
+    oo_log_payload(oo_payload_len, source, oo_timestamp);
+    LED_TOGGLE(2);
+    goto restart;
   }
-  // Uart0Transmit(payload_idx);
-  // Uart0Transmit(oo_payload[payload_idx]);
   return oo_status;
  error:
   oo_error++;
  restart:
-  oo_status = OO_GOT_ITIME;
+  oo_status = OO_READY_SAMPLE;
   return oo_status;
 }
 
@@ -644,16 +641,6 @@ int do_log(void)
   #if LOG_OO_0
           // LED_TOGGLE(3);
           oo_init = log_oo(inc, LOG_SOURCE_UART0);
-          // if (oo_init == 0)
-          //   Uart0Transmit('0');
-          // else if (oo_init == 1)
-          //   Uart0Transmit('1');
-          // else if (oo_init == 2)
-          //   Uart0Transmit('2');
-          // else if (oo_init == 3)
-          //   Uart0Transmit('3');
-          // else
-          //   Uart0Transmit('x');
   #else
   #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART0);
@@ -673,15 +660,13 @@ int do_log(void)
         static unsigned int transmit_timestamp = 0;
         static unsigned int transmit_delta;
 
-        transmit_delta = getclock() - transmit_timestamp;
-        // if (transmit_delta > 50000)
-        //   oo_init = OO_UNINIT;
         //retry periodically if no response
         switch (oo_init) {
         case OO_UNINIT:
+          transmit_delta = getclock() - transmit_timestamp;
           if (transmit_delta > 10000) { //10000 = 1second
-          Uart1Transmit(OO_VERSION); //will reply with ACK + 2 bytes if ready
-          transmit_timestamp = getclock();
+            Uart1Transmit(OO_VERSION); //will reply with ACK + 2 bytes if ready
+            transmit_timestamp = getclock();
           }
           break;
         case OO_INIT:
@@ -699,15 +684,20 @@ int do_log(void)
           sys_time_usleep(10000); //10000 = 10ms
           break;
         case OO_GOT_ITIME:
-          // Uart1Transmit('k');
-        // case OO_ENABLED_CHKSUM:
-          Uart1Transmit('T');
+          Uart1Transmit('k');
+          sys_time_usleep(10000);
+          Uart1Transmit('!');
+          Uart1Transmit(0x00);
+          oo_init = -1;
+          break;
+        case OO_ENABLED_CHKSUM:
+          Uart1Transmit('T'); //set trigger mode
           sys_time_usleep(10000);
           Uart1Transmit(0x00);
           Uart1Transmit(0x03);
           oo_init = -1;
           break;
-        case OO_SET_TRIGGER:
+        case OO_READY_SAMPLE:
           Uart1Transmit(OO_SAMPLE); //tell oo to collect data
           transmit_timestamp = getclock();
           oo_init = -1;
