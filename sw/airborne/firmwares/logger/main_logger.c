@@ -163,7 +163,7 @@
 #define OO_VERSION 'v'
 #define OO_INTSET 'I'
 #define OO_CHKMODE 'k'
-#define OO_INTTIME 100 //integration time in ms
+#define OO_INTTIME 60 //integration time in ms
 #define OO_ACK 0x06
 #define OO_NAK 0x15
 #define OO_STX 0x02
@@ -176,9 +176,9 @@
 #define OO_ENABLED_CHKSUM 3
 #define OO_READY_SAMPLE 4
 #define OO_GOT_STX 5
-#define OO_GOT_PAYLOAD 6
-#define OO_GOT_CHK_A 7
-#define OO_SAVE_DATA 8
+#define OO_SET_TIMESTAMP 6
+#define OO_GOT_PAYLOAD 7
+#define OO_GOT_CHK_A 8
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -447,13 +447,19 @@ char log_oo(unsigned char c, unsigned char source)
       oo_payload_len = 0;
       payload_idx = 0;
       oo_chk_total = 0;
-      oo_timestamp = getclock();
+      // oo_timestamp = getclock(); //can be large delay between this and trigger
       oo_status++;
     }
     // else
       // oo_status = OO_UNINIT;
     break;
-  case OO_GOT_STX: //everything else is data until end bits
+  case OO_GOT_STX:
+    oo_timestamp = getclock(); //set timestamp at reception of 1st data bit
+    oo_payload[payload_idx] = c;
+    payload_idx++;
+    oo_status++;
+    break;
+  case OO_SET_TIMESTAMP: //everything else is data until end bits
     oo_payload[payload_idx] = c;
     if (c == OO_EB2) {
       if (oo_payload[payload_idx-1] == OO_EB1) {
@@ -684,14 +690,14 @@ int do_log(void)
           sys_time_usleep(10000); //10000 = 10ms
           break;
         case OO_GOT_ITIME:
-          Uart1Transmit('k');
+          Uart1Transmit('k'); //enable transmission of spectrum checksum
           sys_time_usleep(10000);
           Uart1Transmit('!');
           Uart1Transmit(0x00);
           oo_init = -1;
           break;
         case OO_ENABLED_CHKSUM:
-          Uart1Transmit('T'); //set trigger mode
+          Uart1Transmit('T'); //set trigger mode (see manual)
           sys_time_usleep(10000);
           Uart1Transmit(0x00);
           Uart1Transmit(0x03);
