@@ -163,7 +163,7 @@
 #define OO_VERSION 'v'
 #define OO_INTSET 'I'
 #define OO_CHKMODE 'k'
-#define OO_INTTIME 2 //integration time in ms
+#define OO_INTTIME 10 //integration time in ms
 #define OO_ACK 0x06
 #define OO_NAK 0x15
 #define OO_STX 0x02
