@@ -616,29 +616,29 @@ int do_log(void)
 
 
 #ifdef USE_UART0
-  #if LOG_OO_0
-      static unsigned char oo_init = UNINIT;
-      if (oo_init == OO_UNINIT) {
-        Uart0Transmit(OO_VERSION); //will reply with ACK if ready
-        oo_init = -1;
-      }
-      if (oo_init == OO_INIT) {
-        Uart0Transmit(OO_INTSET); //set the spectrometer integration time
-        unsigned int intTime = OO_INTTIME;
-        unsigned char timeLow,timeHigh;
-        timeLow = (char)intTime;
-        timeHigh = (char)(intTime >> 8);
-        Uart0Transmit(timeHigh);
-        Uart0Transmit(timeLow);
-      }
-      if (oo_init == OO_GOT_ITIME) {
-        Uart0Transmit(OO_SAMPLE); //tell oo to collect data
-        oo_init = -1;
-        // LED_TOGGLE(2);
-        // sys_time_usleep(1000000);
-        // oo_init++;
-      }
-  #endif
+  // #if LOG_OO_0
+  //     static unsigned char oo_init = UNINIT;
+  //     if (oo_init == OO_UNINIT) {
+  //       Uart0Transmit(OO_VERSION); //will reply with ACK if ready
+  //       oo_init = -1;
+  //     }
+  //     if (oo_init == OO_INIT) {
+  //       Uart0Transmit(OO_INTSET); //set the spectrometer integration time
+  //       unsigned int intTime = OO_INTTIME;
+  //       unsigned char timeLow,timeHigh;
+  //       timeLow = (char)intTime;
+  //       timeHigh = (char)(intTime >> 8);
+  //       Uart0Transmit(timeHigh);
+  //       Uart0Transmit(timeLow);
+  //     }
+  //     if (oo_init == OO_GOT_ITIME) {
+  //       Uart0Transmit(OO_SAMPLE); //tell oo to collect data
+  //       oo_init = -1;
+  //       // LED_TOGGLE(2);
+  //       // sys_time_usleep(1000000);
+  //       // oo_init++;
+  //     }
+  // #endif
       temp = 0;
       while (Uart0ChAvailable() && (temp++ < 128))
       {
