@@ -649,40 +649,40 @@ int do_log(void)
         case OO_UNINIT:
           transmit_delta = getclock() - transmit_timestamp;
           if (transmit_delta > 10000) { //10000 = 1second
-            Uart1Transmit(OO_VERSION); //will reply with ACK + 2 bytes if ready
+            UART1Transmit(OO_VERSION); //will reply with ACK + 2 bytes if ready
             transmit_timestamp = getclock();
           }
           break;
         case OO_INIT:
           sys_time_usleep(10000); //10000 = 10ms
-          Uart1Transmit(OO_INTSET); //set the spectrometer integration time
+          UART1Transmit(OO_INTSET); //set the spectrometer integration time
           unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
           unsigned char timeLow,timeHigh;
           timeLow = (char)intTime;
           timeHigh = (char)(intTime >> 8);
           sys_time_usleep(10000); //10000 = 10ms
-          Uart1Transmit(timeHigh);
-          Uart1Transmit(timeLow);
+          UART1Transmit(timeHigh);
+          UART1Transmit(timeLow);
           // transmit_timestamp = getclock();
           oo_init = -1;
           sys_time_usleep(10000); //10000 = 10ms
           break;
         case OO_GOT_ITIME:
-          Uart1Transmit('k'); //enable transmission of spectrum checksum
+          UART1Transmit('k'); //enable transmission of spectrum checksum
           sys_time_usleep(10000);
-          Uart1Transmit('!');
-          Uart1Transmit(0x00);
+          UART1Transmit('!');
+          UART1Transmit(0x00);
           oo_init = -1;
           break;
         case OO_ENABLED_CHKSUM:
-          Uart1Transmit('T'); //set trigger mode (see manual)
+          UART1Transmit('T'); //set trigger mode (see manual)
           sys_time_usleep(10000);
-          Uart1Transmit(0x00);
-          Uart1Transmit(0x03);
+          UART1Transmit(0x00);
+          UART1Transmit(0x03);
           oo_init = -1;
           break;
         case OO_READY_SAMPLE:
-          Uart1Transmit(OO_SAMPLE); //tell oo to collect data
+          UART1Transmit(OO_SAMPLE); //tell oo to collect data
           transmit_timestamp = getclock();
           oo_init = -1;
         }
@@ -757,16 +757,18 @@ int main(void)
 #endif
 
   // Direct SD Reader Mode
-  if ((IO0PIN & _BV(VBUS_PIN))>>VBUS_PIN)
-  {
-    LED_OFF(LED_YELLOW);
-    LED_ON(LED_RED);
-    main_mass_storage();
-  }
+  // if ((IO0PIN & _BV(VBUS_PIN))>>VBUS_PIN)
+  // {
+  //   LED_OFF(LED_YELLOW);
+  //   LED_ON(LED_RED);
+  //   main_mass_storage();
+  // }
 
   while(1)
   {
     LED_ON(LED_YELLOW);
+    UART1Transmit('t');
+    uart_transmit(&uart1, 't');
     logstatus = do_log();
     LED_OFF(LED_YELLOW);
 

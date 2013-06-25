@@ -45,7 +45,7 @@ endif
 
 #set the speed
 ap.CFLAGS += -DUSE_UART0 -DUART0_BAUD=$(UART0_BAUD) -DUSE_UART0_TX=FALSE -DPERIPHERALS_AUTO_INIT
-ap.CFLAGS += -DUSE_UART1 -DUART1_BAUD=$(UART1_BAUD)
+ap.CFLAGS += -DUSE_UART1 -DUART1_BAUD=$(UART1_BAUD) -DUSE_UART1_TX=TRUE
 ap.CFLAGS += -DLOG_STOP_KEY=$(LOG_STOP_KEY)
 ap.srcs += $(SRC_ARCH)/mcu_periph/uart_arch.c
 ap.srcs += mcu_periph/uart.c
