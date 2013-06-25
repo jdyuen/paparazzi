@@ -39,8 +39,12 @@
 #include "mcu_periph/uart.h"
 #include "messages.h"
 #include "subsystems/datalink/downlink.h"
-#include "estimator.h"
 
+// In I2C mode we can not inline this function:
+void dc_send_command(uint8_t cmd)
+{
+  atmega_i2c_cam_ctrl_send(cmd);
+}
 
 static struct i2c_transaction atmega_i2c_cam_ctrl_trans;
 
@@ -81,7 +85,7 @@ void atmega_i2c_cam_ctrl_send(uint8_t cmd)
 
   // Send Command
   atmega_i2c_cam_ctrl_trans.buf[0] = cmd;
-  I2CTransceive(ATMEGA_I2C_DEV, atmega_i2c_cam_ctrl_trans, ATMEGA_SLAVE_ADDR, 1, 1);
+  i2c_transceive(&ATMEGA_I2C_DEV, &atmega_i2c_cam_ctrl_trans, ATMEGA_SLAVE_ADDR, 1, 1);
 
   if (cmd == DC_SHOOT)
   {

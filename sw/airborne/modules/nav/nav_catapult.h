@@ -22,7 +22,7 @@
  */
 
 /**
- * @file module/nav/nav_catapult.h
+ * @file modules/nav/nav_catapult.h
  * @brief catapult launch timing system
  */
 
@@ -31,6 +31,12 @@
 
 #include "std.h"
 #include "paparazzi.h"
+
+extern float nav_catapult_motor_delay;
+extern float nav_catapult_acceleration_threshold;
+extern float nav_catapult_heading_delay;
+extern float nav_catapult_initial_pitch;
+extern float nav_catapult_initial_throttle;
 
 // Module Code
 void nav_catapult_highrate_module(void);

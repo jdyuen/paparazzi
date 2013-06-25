@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2003  Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -67,7 +65,7 @@ extern uint8_t ck_a, ck_b;
 #define PprzTransportTrailer(_dev) { \
   PprzTransportPut1Byte(_dev, ck_a);	\
   PprzTransportPut1Byte(_dev, ck_b);	\
-  PprzTransportSendMessage(_dev) \
+  PprzTransportSendMessage(_dev); \
 }
 
 #define PprzTransportPutUint8(_dev, _byte) { \

@@ -26,14 +26,10 @@
 #include "firmwares/rotorcraft/stabilization.h"
 #include "firmwares/rotorcraft/stabilization/stabilization_attitude_rc_setpoint.h"
 
-#if USE_SETPOINTS_WITH_TRANSITIONS
-#include "firmwares/rotorcraft/stabilization/quat_setpoint_int.h"
-#endif
-
 #include <stdio.h>
 #include "math/pprz_algebra_float.h"
 #include "math/pprz_algebra_int.h"
-#include "subsystems/ahrs.h"
+#include "state.h"
 #include "generated/airframe.h"
 
 struct Int32AttitudeGains stabilization_gains = {
@@ -78,15 +74,29 @@ void stabilization_attitude_init(void) {
 
 void stabilization_attitude_enter(void) {
 
-#if !USE_SETPOINTS_WITH_TRANSITIONS
   /* reset psi setpoint to current psi angle */
-  stab_att_sp_euler.psi = ahrs.ltp_to_body_euler.psi;
-#endif
+  stab_att_sp_euler.psi = stabilization_attitude_get_heading_i();
 
   stabilization_attitude_ref_enter();
 
   INT32_QUAT_ZERO(stabilization_att_sum_err_quat);
   INT_EULERS_ZERO(stabilization_att_sum_err);
+}
+
+void stabilization_attitude_set_failsafe_setpoint(void) {
+  /* set failsafe to zero roll/pitch and current heading */
+  int32_t heading2 = stabilization_attitude_get_heading_i() / 2;
+  PPRZ_ITRIG_COS(stab_att_sp_quat.qi, heading2);
+  stab_att_sp_quat.qx = 0;
+  stab_att_sp_quat.qy = 0;
+  PPRZ_ITRIG_SIN(stab_att_sp_quat.qz, heading2);
+}
+
+void stabilization_attitude_set_from_eulers_i(struct Int32Eulers *sp_euler) {
+  // copy euler setpoint for debugging
+  memcpy(&stab_att_sp_euler, sp_euler, sizeof(struct Int32Eulers));
+  INT32_QUAT_OF_EULERS(stab_att_sp_quat, *sp_euler);
+  INT32_QUAT_WRAP_SHORTEST(stab_att_sp_quat);
 }
 
 #define OFFSET_AND_ROUND(_a, _b) (((_a)+(1<<((_b)-1)))>>(_b))
@@ -135,14 +145,16 @@ void stabilization_attitude_run(bool_t enable_integrator) {
 
   /* attitude error                          */
   struct Int32Quat att_err;
-  INT32_QUAT_INV_COMP(att_err, ahrs.ltp_to_body_quat, stab_att_ref_quat);
+  struct Int32Quat* att_quat = stateGetNedToBodyQuat_i();
+  INT32_QUAT_INV_COMP(att_err, *att_quat, stab_att_ref_quat);
   /* wrap it in the shortest direction       */
   INT32_QUAT_WRAP_SHORTEST(att_err);
   INT32_QUAT_NORMALIZE(att_err);
 
   /*  rate error                */
   struct Int32Rates rate_err;
-  RATES_DIFF(rate_err, stab_att_ref_rate, ahrs.body_rate);
+  struct Int32Rates* body_rate = stateGetBodyRates_i();
+  RATES_DIFF(rate_err, stab_att_ref_rate, *body_rate);
 
   /* integrated error */
   if (enable_integrator) {
@@ -180,14 +192,11 @@ void stabilization_attitude_run(bool_t enable_integrator) {
 }
 
 void stabilization_attitude_read_rc(bool_t in_flight) {
-
-#if USE_SETPOINTS_WITH_TRANSITIONS
-  stabilization_attitude_read_rc_absolute(in_flight);
+  struct FloatQuat q_sp;
+#if USE_EARTH_BOUND_RC_SETPOINT
+  stabilization_attitude_read_rc_setpoint_quat_earth_bound_f(&q_sp, in_flight);
 #else
-  stabilization_attitude_read_rc_setpoint_eulers(&stab_att_sp_euler, in_flight);
-  /* update quaternion setpoint from euler setpoint */
-  INT32_QUAT_OF_EULERS(stab_att_sp_quat, stab_att_sp_euler);
-  INT32_QUAT_WRAP_SHORTEST(stab_att_sp_quat);
+  stabilization_attitude_read_rc_setpoint_quat_f(&q_sp, in_flight);
 #endif
-
+  QUAT_BFP_OF_REAL(stab_att_sp_quat, q_sp);
 }

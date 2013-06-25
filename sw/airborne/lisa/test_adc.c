@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2010 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -21,9 +19,6 @@
  * Boston, MA 02111-1307, USA.
  *
  */
-
-#include <stm32/flash.h>
-#include <stm32/misc.h>
 
 #include BOARD_CONFIG
 #include "mcu.h"

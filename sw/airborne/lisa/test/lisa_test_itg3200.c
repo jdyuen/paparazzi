@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2010 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -28,11 +26,9 @@
  */
 
 
-#include <stm32/gpio.h>
-#include <stm32/flash.h>
-#include <stm32/misc.h>
-#include <stm32/exti.h>
-#include <stm32/spi.h>
+#include <libopencm3/stm32/f1/gpio.h>
+#include <libopencm3/stm32/exti.h>
+#include <libopencm3/stm32/spi.h>
 
 #include BOARD_CONFIG
 #include "mcu.h"
@@ -43,7 +39,7 @@
 #include "std.h"
 #include "math/pprz_algebra_int.h"
 
-#include "peripherals/itg3200.h"
+#include "peripherals/itg3200_regs.h"
 #include "my_debug_servo.h"
 #include "led.h"
 
@@ -58,8 +54,6 @@ static struct i2c_transaction i2c_trans;
 static uint8_t gyro_state = 0;
 static volatile uint8_t gyro_ready_for_read = FALSE;
 static uint8_t reading_gyro = FALSE;
-
-void exti15_10_irq_handler(void);
 
 int main(void) {
   main_init();
@@ -87,16 +81,27 @@ static inline void main_periodic_task( void ) {
     LED_PERIODIC();
   });
   RunOnceEvery(256, {
-   DOWNLINK_SEND_I2C_ERRORS(DefaultChannel, DefaultDevice,
-			    &i2c2.errors->ack_fail_cnt,
-			    &i2c2.errors->miss_start_stop_cnt,
-			    &i2c2.errors->arb_lost_cnt,
-			    &i2c2.errors->over_under_cnt,
-			    &i2c2.errors->pec_recep_cnt,
-			    &i2c2.errors->timeout_tlow_cnt,
-			    &i2c2.errors->smbus_alert_cnt,
-			    &i2c2.errors->unexpected_event_cnt,
-			    &i2c2.errors->last_unexpected_event);
+      uint16_t i2c2_ack_fail_cnt          = i2c2.errors->ack_fail_cnt;
+      uint16_t i2c2_miss_start_stop_cnt   = i2c2.errors->miss_start_stop_cnt;
+      uint16_t i2c2_arb_lost_cnt          = i2c2.errors->arb_lost_cnt;
+      uint16_t i2c2_over_under_cnt        = i2c2.errors->over_under_cnt;
+      uint16_t i2c2_pec_recep_cnt         = i2c2.errors->pec_recep_cnt;
+      uint16_t i2c2_timeout_tlow_cnt      = i2c2.errors->timeout_tlow_cnt;
+      uint16_t i2c2_smbus_alert_cnt       = i2c2.errors->smbus_alert_cnt;
+      uint16_t i2c2_unexpected_event_cnt  = i2c2.errors->unexpected_event_cnt;
+      uint32_t i2c2_last_unexpected_event = i2c2.errors->last_unexpected_event;
+      const uint8_t _bus2 = 2;
+      DOWNLINK_SEND_I2C_ERRORS(DefaultChannel, DefaultDevice,
+                               &i2c2_ack_fail_cnt,
+                               &i2c2_miss_start_stop_cnt,
+                               &i2c2_arb_lost_cnt,
+                               &i2c2_over_under_cnt,
+                               &i2c2_pec_recep_cnt,
+                               &i2c2_timeout_tlow_cnt,
+                               &i2c2_smbus_alert_cnt,
+                               &i2c2_unexpected_event_cnt,
+                               &i2c2_last_unexpected_event,
+                               &_bus2);
     });
 
   switch (gyro_state) {
@@ -219,6 +224,9 @@ static inline void main_event_task( void ) {
 }
 
 static inline void main_init_hw( void ) {
+#warning "Needs to be ported to libopencm3 or use the real driver!"
+
+#if 0
   /* set mag ss as floating input (on PC12) = shorted to sda         ------------------------------*/
   /* set mag reset as floating input (on PC13) = shorted to scl      ------------------------------*/
   RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
@@ -259,6 +267,7 @@ static inline void main_init_hw( void ) {
 
   DEBUG_SERVO1_INIT();
   DEBUG_SERVO2_INIT();
+#endif
 
 }
 
@@ -268,8 +277,7 @@ void exti15_10_irq_handler(void) {
   //  DEBUG_S4_ON();
 
   /* clear EXTI */
-  if(EXTI_GetITStatus(EXTI_Line14) != RESET)
-    EXTI_ClearITPendingBit(EXTI_Line14);
+  exti_reset_request(EXTI14);
 
   //  DEBUG_S4_TOGGLE();
 

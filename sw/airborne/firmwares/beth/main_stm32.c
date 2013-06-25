@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2010 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -28,7 +26,7 @@
 #include "mcu_periph/can.h"
 #include "mcu_periph/sys_time.h"
 #include "subsystems/datalink/downlink.h"
-#include "firmwares/rotorcraft/commands.h"
+#include "subsystems/commands.h"
 #include "firmwares/rotorcraft/actuators.h"
 //#include "booz/booz_radio_control.h"
 #include "subsystems/imu.h"

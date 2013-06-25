@@ -32,17 +32,6 @@
 #include "generated/airframe.h"
 #include "firmwares/rotorcraft/guidance/guidance_v_ref.h"
 
-/** Supervision default bounds
- *  In case Asctec controllers are used without supervision
- *  Used in control and adaptation filter
- * */
-#ifndef SUPERVISION_MIN_MOTOR
-#define SUPERVISION_MIN_MOTOR 1
-#endif
-#ifndef SUPERVISION_MAX_MOTOR
-#define SUPERVISION_MAX_MOTOR 200
-#endif
-
 #include "firmwares/rotorcraft/guidance/guidance_v_adpt.h"
 
 #define GUIDANCE_V_MODE_KILL      0
@@ -95,9 +84,10 @@ extern int32_t guidance_v_fb_cmd;    ///< feed-back command
 extern int32_t guidance_v_delta_t;
 
 /** nominal throttle for hover.
- * range: 0 : #MAX_PPRZ
+ * This is only used if #"GUIDANCE_V_NOMINAL_HOVER_THROTTLE is defined!
+ * Unit: factor of #MAX_PPRZ with range 0.1 : 0.9
  */
-extern int16_t guidance_v_nominal_throttle;
+extern float guidance_v_nominal_throttle;
 
 extern int32_t guidance_v_kp; ///< vertical control P-gain
 extern int32_t guidance_v_kd; ///< vertical control D-gain
@@ -113,11 +103,5 @@ extern void guidance_v_run(bool_t in_flight);
     guidance_v_ki = _val;				\
     guidance_v_z_sum_err = 0;			\
   }
-
-#define guidance_v_SetNominalHoverThrottle(_throttle) { \
-    guidance_v_nominal_throttle = _throttle;            \
-    Bound(guidance_v_nominal_throttle, 0.1*MAX_PPRZ, 0.9*MAX_PPRZ);  \
-  }
-
 
 #endif /* GUIDANCE_V */

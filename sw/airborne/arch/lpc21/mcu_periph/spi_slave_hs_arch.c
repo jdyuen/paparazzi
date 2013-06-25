@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2011 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -19,6 +17,13 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
+ */
+
+/**
+ * @file arch/lpc21/mcu_periph/spi_slave_hs_arch.c
+ * @ingroup lpc21_arch
+ *
+ * Highspeed SPI Slave Interface.
  */
 
 #include "spi_slave_hs_arch.h"
@@ -94,6 +99,12 @@ static void SSP_ISR(void) __attribute__((naked));
 #define SSP_Read() 	SSPDR
 #define SSP_Status() 	SSPSR
 
+/** default initial settings */
+#ifndef SPI1_VIC_SLOT
+#define SPI1_VIC_SLOT 7
+#endif
+
+
 void spi_init(void) {
 
   /* setup pins for SSP (SCK, MISO, MOSI) */
@@ -109,8 +120,8 @@ void spi_init(void) {
   /* initialize interrupt vector */
   VICIntSelect &= ~VIC_BIT( VIC_SPI1 );             /* SPI1 selected as IRQ */
   VICIntEnable = VIC_BIT( VIC_SPI1 );               /* enable it            */
-  _VIC_CNTL(SSP_VIC_SLOT) = VIC_ENABLE | VIC_SPI1;
-  _VIC_ADDR(SSP_VIC_SLOT) = (uint32_t)SSP_ISR;      /* address of the ISR   */
+  _VIC_CNTL(SPI1_VIC_SLOT) = VIC_ENABLE | VIC_SPI1;
+  _VIC_ADDR(SPI1_VIC_SLOT) = (uint32_t)SSP_ISR;      /* address of the ISR   */
 
 
   // Enable SPI Slave

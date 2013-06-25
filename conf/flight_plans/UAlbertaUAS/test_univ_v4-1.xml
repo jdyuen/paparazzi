@@ -1,0 +1,41 @@
+<!DOCTYPE flight_plan SYSTEM "../flight_plan.dtd">
+<!-- Test flight plan for walking system around university grounds -->
+
+<flight_plan alt="740" ground_alt="665" lat0="53.52720" lon0="-113.52761" max_dist_from_home="1500" name="Basic" security_height="35" qfu="0">  <!-- U of A -->
+  <header>
+#include "subsystems/navigation/nav_line.h"
+#include "subsystems/datalink/datalink.h"
+  </header>
+  <waypoints>
+    <waypoint name="HOME" x="0" y="0"/>
+    <waypoint name="STDBY" x="0" y="-100.1"/>
+    <waypoint name="1" x="10.1" y="-189.9"/>
+    <waypoint name="2" x="132.3" y="-139.1"/>
+    <waypoint name="MOB" x="137.0" y="-11.6"/>
+    <waypoint name="CLIMB" x="-114.5" y="-162.3"/>
+  </waypoints>
+  <blocks>
+    <block name="Wait GPS">
+      <set value="1" var="kill_throttle"/>
+      <while cond="!GpsFixValid()"/>
+    </block>
+    <block name="Geo init">
+      <while cond="LessThan(NavBlockTime(), 10)"/>
+      <call fun="NavSetGroundReferenceHere()"/>
+    </block>
+    <block name="Holding point">
+      <!--set var="nav_mode" value="NAV_MODE_ROLL"/-->
+      <set value="1" var="kill_throttle"/>
+      <attitude roll="0" throttle="0" vmode="throttle"/>
+    </block>
+    <block key="t" name="Takeoff" strip_button="Takeoff (wp CLIMB)" strip_icon="takeoff.png" group="home">
+      <exception cond="GetPosAlt() > (ground_alt+25)" deroute="Standby"/>
+      <set value="0" var="kill_throttle"/>
+      <set value="0" var="estimator_flight_time"/>
+      <go from="HOME" throttle="1.0" vmode="throttle" wp="CLIMB" pitch="15"/>
+    </block>
+    <block key="<Control>a" name="Standby" strip_button="Standby" strip_icon="home.png" group="home">
+      <circle radius="nav_radius" wp="STDBY"/>
+    </block>
+  </blocks>
+</flight_plan>

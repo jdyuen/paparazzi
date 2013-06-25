@@ -1,5 +1,5 @@
+# Hey Emacs, this is a -*- makefile -*-
 #
-#   $Id$
 #   Copyright (C) 2003 Pascal Brisset, Antoine Drouin
 #
 # This file is part of paparazzi.
@@ -23,24 +23,22 @@
 # Quiet compilation
 Q=@
 
-LBITS := $(shell getconf LONG_BIT)
-ifeq ($(LBITS),64)
-   FPIC=-fPIC
-   OCAMLCFLAGS=-thread -ccopt -fPIC
-else
-   FPIC=
-   OCAMLCFLAGS=-thread
-endif
-FPIC=-fPIC
+OCAMLCFLAGS=-thread -ccopt -fPIC
 
-OCAMLC=ocamlc
-OCAMLOPT=ocamlopt
-OCAMLOPTFLAGS=-thread
-OCAMLNETINCLUDES=$(shell ocamlfind query -r -i-format netstring)
-OCAMLNETCMA=$(shell ocamlfind query -r -a-format -predicates byte netstring)
-INCLUDES= $(shell ocamlfind query -r -i-format lablgtk2) -I ../../lib/ocaml $(shell ocamlfind query -r -i-format xml-light) $(OCAMLNETINCLUDES)
-LIBS=$(OCAMLNETCMA) glibivy-ocaml.cma lablgtk.cma lablglade.cma lib-pprz.cma lablgnomecanvas.cma xlib-pprz.cma
-CMXA=$(LIBS:.cma=.cmxa)
+include ../../Makefile.ocaml
+
+INCLUDES=
+LIBS=
+LIBSX=$(LIBS:.cma=.cmxa)
+
+INCLUDES= -I ../multimon
+PKG = -package pprz.xlib
+LINKPKG = $(PKG) -linkpkg -dllpath-pkg pprz.xlib
+
+LABLGTK2INIT = $(shell ocamlfind query -p-format lablgtk2.init 2>/dev/null)
+ifeq ($(LABLGTK2INIT),)
+LABLGTK2INIT = $(shell ocamlfind query -p-format lablgtk2.auto-init 2>/dev/null)
+endif
 
 ML= gtk_setting_time.ml gtk_strip.ml horizon.ml strip.ml gtk_save_settings.ml saveSettings.ml page_settings.ml pages.ml speech.ml plugin.ml sectors.ml map2d.ml editFP.ml live.ml particules.ml papgets.ml gcs.ml
 MAIN=gcs
@@ -51,51 +49,55 @@ all : $(MAIN)
 
 opt : $(MAIN).opt
 
-$(MAIN) : $(CMO) ../../lib/ocaml/xlib-pprz.cma ../../lib/ocaml/lib-pprz.cma
+$(MAIN) : $(CMO)
 	@echo OL $@
-	$(Q)$(OCAMLC) $(OCAMLCFLAGS) -custom $(INCLUDES) unix.cma str.cma xml-light.cma $(LIBS) threads.cma gtkThread.cmo myGtkInit.cmo $(CMO) -o $@
+	$(Q)$(OCAMLC) $(OCAMLCFLAGS) $(INCLUDES) $(LIBS) $(LINKPKG) myGtkInit.cmo $(CMO) -o $@
 
 $(MAIN).opt : $(CMX)
 	@echo OOL $@
-	$(Q)$(OCAMLOPT) $(OCAMLCFLAGS) $(INCLUDES) str.cmxa unix.cmxa xml-light.cmxa $(LIBS:.cma=.cmxa) threads.cmxa gtkThread.cmx gtkInit.cmx $(CMX) -o $@
+	$(Q)$(OCAMLOPT) $(OCAMLCFLAGS) $(INCLUDES) $(LIBSX) -package pprz.xlib,$(LABLGTK2INIT) -linkpkg $(CMX) -o $@
 
 
 %.cmo: %.ml
 	@echo OC $<
-	$(Q)$(OCAMLC) $(OCAMLCFLAGS) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(OCAMLCFLAGS) $(INCLUDES) $(PKG) -c $<
 %.cmi: %.mli
 	@echo OCI $<
-	$(Q)$(OCAMLC) $(OCAMLCFLAGS) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(OCAMLCFLAGS) $(INCLUDES) $(PKG) -c $<
 %.cmx: %.ml
 	@echo OOC $<
-	$(Q)$(OCAMLOPT) $(OCAMLCFLAGS) $(INCLUDES) -c $<
+	$(Q)$(OCAMLOPT) $(OCAMLCFLAGS) $(INCLUDES) $(PKG) -c $<
 
 saveSettings.cmo : gtk_save_settings.cmo
 saveSettings.cmx: gtk_save_settings.cmx
 
 gtk_strip.ml : gcs.glade
-	lablgladecc2 -root eventbox_strip -hide-default $< | grep -B 1000000 "  end" > $@
+	@echo GLADE $@
+	$(Q)lablgladecc2 -root eventbox_strip -hide-default $< | grep -B 1000000 "  end" > $@
 
 gtk_setting_time.ml : gcs.glade
-	lablgladecc2 -root setting_time -hide-default $< | grep -B 1000000 "  end" > $@
+	@echo GLADE $@
+	$(Q)lablgladecc2 -root setting_time -hide-default $< | grep -B 1000000 "  end" > $@
 
 gtk_save_settings.ml : gcs.glade
-	lablgladecc2 -root save_settings -hide-default $< | grep -B 1000000 "  end" > $@
+	@echo GLADE $@
+	$(Q)lablgladecc2 -root save_settings -hide-default $< | grep -B 1000000 "  end" > $@
 
 strip.cmo : gtk_strip.cmo gtk_setting_time.cmo
 
 compass : compass.ml
-	$(OCAMLC) -custom $(OCAMLCFLAGS) $(INCLUDES) unix.cma str.cma xml-light.cma $(LIBS) gtkInit.cmo $^ -o $@
+	@echo OL $@
+	$(Q)$(OCAMLC) $(OCAMLCFLAGS) $(INCLUDES) $(LINKPKG) gtkInit.cmo $^ -o $@
 
 
 clean:
-	rm -f *~* *.cm* *.o *.out *.opt map2d gcs .depend gtk_strip.ml gtk_setting_time.ml gtk_save_settings.ml
+	$(Q)rm -f *~* *.cm* *.o *.out *.opt map2d gcs .depend gtk_strip.ml gtk_setting_time.ml gtk_save_settings.ml compass ant_track ant_track_pmm test_enose actuators
 
-
+.PHONY: all opt clean
 
 
 CC = gcc
-CFLAGS=-g -O2 -Wall `pkg-config gtk+-2.0 --cflags` $(FPIC)
+CFLAGS=-g -O2 -Wall `pkg-config gtk+-2.0 --cflags` -fPIC
 LDFLAGS=`pkg-config gtk+-2.0 --libs` -s -lglibivy
 
 
@@ -117,7 +119,7 @@ actuators : actuators.c
 #
 
 .depend: Makefile
-	ocamldep -I ../../lib/ocaml *.ml* > .depend
+	$(OCAMLDEP) -I $(LIBPPRZDIR) *.ml* > .depend
 
 ifneq ($(MAKECMDGOALS),clean)
 -include .depend

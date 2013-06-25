@@ -23,9 +23,7 @@ stm_passthrough.ARCHDIR = stm32
 stm_passthrough.CFLAGS += -I$(SRC_FIRMWARE) -I$(SRC_LISA) -I$(SRC_LISA_ARCH) -I$(SRC_BOOZ) -I$(SRC_BOOZ_ARCH) -I$(SRC_BOARD) -I$(SRC_ROTOR_ARCH) -I$(SRC_IMU_ARCH)
 stm_passthrough.CFLAGS += -DBOARD_CONFIG=$(BOARD_CFG)
 stm_passthrough.CFLAGS += -DPERIPHERALS_AUTO_INIT
-stm_passthrough.srcs = $(SRC_LISA)/lisa_stm_passthrough_main.c \
-                       $(SRC_ARCH)/stm32_exceptions.c          \
-                       $(SRC_ARCH)/stm32_vector_table.c
+stm_passthrough.srcs = $(SRC_LISA)/lisa_stm_passthrough_main.c
 
 # Leds
 stm_passthrough.CFLAGS += -DUSE_LED
@@ -39,7 +37,7 @@ stm_passthrough.srcs += mcu_periph/sys_time.c $(SRC_ARCH)/mcu_periph/sys_time_ar
 
 # Telemetry
 stm_passthrough.CFLAGS += -DDOWNLINK
-stm_passthrough.CFLAGS += -DDOWNLINK_TRANSPORT=PprzTransport -DDOWNLINK_DEVICE=Uart2
+stm_passthrough.CFLAGS += -DDOWNLINK_TRANSPORT=PprzTransport -DDOWNLINK_DEVICE=UART2
 stm_passthrough.srcs += subsystems/datalink/downlink.c subsystems/datalink/pprz_transport.c
 stm_passthrough.CFLAGS += -DUSE_UART2 -DUART2_BAUD=B57600
 stm_passthrough.srcs += mcu_periph/uart.c
@@ -49,7 +47,7 @@ stm_passthrough.srcs += $(SRC_ARCH)/mcu_periph/uart_arch.c
 stm_passthrough.CFLAGS += -DUSE_OVERO_LINK
 stm_passthrough.CFLAGS += -DOVERO_LINK_MSG_UP=AutopilotMessagePTUp
 stm_passthrough.CFLAGS += -DOVERO_LINK_MSG_DOWN=AutopilotMessagePTDown
-stm_passthrough.CFLAGS += -DOVERO_LINK_LED_OK=3 -DOVERO_LINK_LED_KO=2 -DUSE_DMA1_C2_IRQ
+stm_passthrough.CFLAGS += -DOVERO_LINK_LED_OK=3 -DOVERO_LINK_LED_KO=2
 stm_passthrough.srcs += $(SRC_LISA)/lisa_overo_link.c           \
             $(SRC_LISA_ARCH)/lisa_overo_link_arch.c
 
@@ -62,7 +60,7 @@ stm_passthrough.srcs += $(SRC_LISA)/lisa_overo_link.c           \
 stm_passthrough.srcs += math/pprz_trig_int.c
 stm_passthrough.srcs += lisa/plug_sys.c
 
-stm_passthrough.srcs += $(SRC_FIRMWARE)/commands.c
+stm_passthrough.srcs += subsystems/commands.c
 
 # Radio control
 #
@@ -78,7 +76,7 @@ stm_passthrough.srcs += $(SRC_FIRMWARE)/commands.c
 #stm_passthrough.srcs += $(SRC_FIRMWARE)/actuators/actuators_asctec.c
 #stm_passthrough.srcs += mcu_periph/i2c.c $(SRC_ARCH)/mcu_periph/i2c_arch.c
 #
-#stm_passthrough.CFLAGS += -DACTUATORS_ASCTEC_DEVICE=i2c1
+#stm_passthrough.CFLAGS += -DACTUATORS_ASCTEC_I2C_DEV=i2c1
 #stm_passthrough.CFLAGS += -DUSE_I2C1
 
 # PWM actuator
@@ -114,8 +112,7 @@ stm_passthrough.CFLAGS += -DUSE_AD1 \
     -DUSE_AD1_1 \
     -DUSE_AD1_2 \
     -DUSE_AD1_3 \
-    -DUSE_AD1_4 \
-    -DUSE_ADC1_2_IRQ_HANDLER
+    -DUSE_AD1_4
 
 
 # Battery monitor

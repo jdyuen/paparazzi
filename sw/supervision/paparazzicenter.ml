@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Paparazzi center main module
  *
  * Copyright (C) 2007 ENAC, Pascal Brisset, Antoine Drouin
@@ -137,7 +135,7 @@ let quit_button_callback = fun gui ac_combo session_combo target_combo () ->
 	  Sys.rename Utils.backup_xml_file Utils.conf_xml_file;
 	  quit_callback gui ac_combo session_combo target_combo ()
       | 3 ->
-	  ignore (Sys.command (sprintf "tkdiff %s %s" Utils.backup_xml_file Utils.conf_xml_file));
+	  ignore (Sys.command (sprintf "meld %s %s" Utils.backup_xml_file Utils.conf_xml_file));
 	  question_box ()
       | 1 ->
 	  Sys.remove Utils.backup_xml_file;
@@ -177,7 +175,7 @@ let () =
     let rec question_box = fun () ->
       match GToolbox.question_box ~title:"Backup" ~buttons:["Keep changes"; "Discard changes"; "View changes"] ~default:2 "Configuration changes made during the last session were not saved. ?" with
       | 2 -> Sys.rename Utils.backup_xml_file Utils.conf_xml_file
-      | 3 -> ignore (Sys.command (sprintf "tkdiff %s %s" Utils.backup_xml_file Utils.conf_xml_file)); question_box ()
+      | 3 -> ignore (Sys.command (sprintf "meld %s %s" Utils.backup_xml_file Utils.conf_xml_file)); question_box ()
       | _ -> Sys.remove Utils.backup_xml_file in
     question_box ()
   end;
@@ -199,15 +197,16 @@ let () =
       let tag = GText.tag ~name:color () in
       tag#set_property (`BACKGROUND color);
       (color, tag))
-      ["red"; "green"; "orange"] in
+      ["red"; "green"; "orange"; "cyan"] in
   let tag_table = GText.tag_table () in
   List.iter (fun (_color, tag) -> tag_table#add tag#as_tag) background_tags;
   let buffer = GText.buffer ~tag_table () in
   gui#console#set_buffer buffer;
 
-  let errors = "red", ["error"; "no such file"; "undefined reference"; "failure"]
+  let errors = "red", ["error"; "no such file"; "undefined reference"; "failure"; "multiple definition"]
   and warnings = "orange", ["warning"]
-  and info = "green", ["pragma message"] in
+  and info = "green", ["pragma message"]
+  and version = "cyan", ["paparazzi version"] in
 
   let color_regexps =
     List.map (fun (color, strings) ->
@@ -215,7 +214,7 @@ let () =
       let s = String.concat "\\|" s in
       let s = ".*\\("^s^"\\)" in
       color, Str.regexp_case_fold s)
-      [errors; warnings; info] in
+      [errors; warnings; info; version] in
   let compute_tags = fun s ->
     let rec loop = function
 	(color, regexp)::rs ->
@@ -237,7 +236,7 @@ let () =
 
   AC.build_handler ~file gui ac_combo target_combo log;
 
-  let session_combo, execute_session = CP.supervision ~file gui log ac_combo in
+  let session_combo, execute_session = CP.supervision ~file gui log ac_combo target_combo in
 
   (* Quit button *)
   ignore (gui#menu_item_quit#connect#activate ~callback:(quit_button_callback gui ac_combo session_combo target_combo));

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008 Gautier Hattenberger
  *
  * This file is part of paparazzi.
@@ -38,20 +36,20 @@
 
 #ifndef JSBSIM_PERIOD
 #define JSBSIM_SPEEDUP 4 ///< how many JSBSim calls per A/P control loop call?
-#define JSBSIM_PERIOD (1000.0/CONTROL_RATE/JSBSIM_SPEEDUP) ///< JSBSim timestep in milliseconds
+#define JSBSIM_PERIOD (1000.0/CONTROL_FREQUENCY/JSBSIM_SPEEDUP) ///< JSBSim timestep in milliseconds
 #else
-#define JSBSIM_SPEEDUP ((uint8_t) (1000./CONTROL_RATE/JSBSIM_PERIOD))
+#define JSBSIM_SPEEDUP ((uint8_t) (1000./CONTROL_FREQUENCY/JSBSIM_PERIOD))
 #endif
 #define DT (JSBSIM_PERIOD*1e-3) ///< JSBSim timestep in seconds
 
-#define SYSTIME_PERIOD ((uint32_t)(SYS_TIME_RESOLUTION * 1000)) ///< in msec
+#define SYSTIME_PERIOD ((uint32_t)(1000. / SYS_TIME_FREQUENCY)) ///< in msec
 
 #define RAD2DEG 57.29578
 #define FT2M 0.3048
 
 extern bool run_model;
 
-void autopilot_init(void);
+void sim_autopilot_init(void);
 void autopilot_periodic_task(void);
 void autopilot_event_task(void);
 void jsbsim_init(void);

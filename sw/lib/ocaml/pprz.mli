@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Downlink protocol (handling messages.xml)
  *
  * Copyright (C) 2003 Pascal Brisset, Antoine Drouin
@@ -90,8 +88,12 @@ exception Unit_conversion_error of string
 (** Unit_conversion_error raised when parsing error occurs *)
 exception Unknown_conversion of string * string
 (** Unknown_conversion raised when conversion fails *)
+exception No_automatic_conversion of string * string
+(** No_automatic_conversion raised when no conversion found
+ *  and from_unit or to_unit are empty string
+ *)
 
-val scale_of_units : string -> string -> float
+val scale_of_units : ?auto:string -> string -> string -> float
 (** scale_of_units from to
  *  Returns conversion factor between two units
  *  The possible conversions are described in conf/units.xml
@@ -99,7 +101,7 @@ val scale_of_units : string -> string -> float
  *  or if units.xml is not valid
  *)
 
-val alt_unit_coef_of_xml : Xml.xml -> string
+val alt_unit_coef_of_xml : ?auto:string -> Xml.xml -> string
 (** Return coef for alternate unit
  *)
 
@@ -160,7 +162,7 @@ module type MESSAGES = sig
   val string_of_message : ?sep:string -> message -> values -> string
   (** [string_of_message ?sep msg values] Default [sep] is space *)
 
-  val message_send : ?timestamp:float -> string -> string -> values -> unit
+  val message_send : ?timestamp:float -> ?link_id:int -> string -> string -> values -> unit
   (** [message_send sender msg_name values] *)
 
   val message_bind : ?sender:string ->string -> (string -> values -> unit) -> Ivy.binding

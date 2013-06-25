@@ -30,6 +30,12 @@
 #define LED_2_BANK 1
 #define LED_2_PIN 24
 
+/* Default actuators driver */
+#define DEFAULT_ACTUATORS "subsystems/actuators/actuators_4017.h"
+#define ActuatorDefaultSet(_x,_y) Actuator4017Set(_x,_y)
+#define ActuatorsDefaultInit() Actuators4017Init()
+#define ActuatorsDefaultCommit() Actuators4017Commit()
+
 /* P0.5 aka MAT0.1  */
 #define SERVO_CLOCK_PIN  5
 #define SERVO_CLOCK_PINSEL PINSEL0
@@ -98,6 +104,9 @@
 /* SPI (SSP) */
 #define SPI_SELECT_SLAVE0_PORT 0
 #define SPI_SELECT_SLAVE0_PIN 20
+#define SPI_SELECT_SLAVE0_PINSEL PINSEL1
+#define SPI_SELECT_SLAVE0_PINSEL_BIT 8
+#define SPI_SELECT_SLAVE0_PINSEL_VAL 0
 
 #define SPI1_DRDY_PINSEL PINSEL1
 #define SPI1_DRDY_PINSEL_BIT   0

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -21,6 +19,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file firmwares/rotorcraft/datalink.c
+ * Handling of messages coming from ground and other A/Cs.
+ *
+ */
+
 #define DATALINK_C
 #define MODULES_DATALINK_C
 
@@ -36,6 +40,10 @@
 
 #ifdef BOOZ_FMS_TYPE
 #include "booz_fms.h"
+#endif
+
+#if defined RADIO_CONTROL && defined RADIO_CONTROL_TYPE_DATALINK
+#include "subsystems/radio_control.h"
 #endif
 
 #include "firmwares/rotorcraft/navigation.h"
@@ -105,6 +113,28 @@ void dl_parse_msg(void) {
     }
     break;
 #endif /* USE_NAVIGATION */
+#ifdef RADIO_CONTROL_TYPE_DATALINK
+  case DL_RC_3CH :
+#ifdef RADIO_CONTROL_DATALINK_LED
+    LED_TOGGLE(RADIO_CONTROL_DATALINK_LED);
+#endif
+    parse_rc_3ch_datalink(
+        DL_RC_3CH_throttle_mode(dl_buffer),
+        DL_RC_3CH_roll(dl_buffer),
+        DL_RC_3CH_pitch(dl_buffer));
+    break;
+  case DL_RC_4CH :
+#ifdef RADIO_CONTROL_DATALINK_LED
+    LED_TOGGLE(RADIO_CONTROL_DATALINK_LED);
+#endif
+    parse_rc_4ch_datalink(
+        DL_RC_4CH_mode(dl_buffer),
+        DL_RC_4CH_throttle(dl_buffer),
+        DL_RC_4CH_roll(dl_buffer),
+        DL_RC_4CH_pitch(dl_buffer),
+        DL_RC_4CH_yaw(dl_buffer));
+    break;
+#endif // RADIO_CONTROL_TYPE_DATALINK
   default:
     break;
   }

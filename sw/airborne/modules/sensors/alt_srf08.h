@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005  Pascal Brisset, Antoine Drouin
  * Copyright (C) 2002  Chris efstathiou hendrix@otenet.gr
  *
@@ -22,8 +20,10 @@
  * Boston, MA 02111-1307, USA.
  *
  */
-/** \file srf08.h
- *  \brief Basic library for SRF08 telemeter
+
+/**
+ * @file modules/sensors/alt_srf08.h
+ * @brief Basic library for SRF08 telemeter
  *
  */
 

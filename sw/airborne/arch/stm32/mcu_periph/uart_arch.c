@@ -1,7 +1,6 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
+ * Copyright (C) 2013 Felix Ruess <felix.ruess@gmail.com>
  *
  * This file is part of paparazzi.
  *
@@ -21,36 +20,64 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include "mcu_periph/uart.h"
+/**
+ * @file arch/stm32/mcu_periph/uart_arch.c
+ * @ingroup stm32_arch
+ *
+ * Handling of UART hardware for STM32.
+ */
 
-#include <stm32/rcc.h>
-#include <stm32/misc.h>
-#include <stm32/usart.h>
-#include <stm32/gpio.h>
+#include "mcu_periph/uart.h"
+#include "mcu_periph/gpio.h"
+
+#include <libopencm3/stm32/gpio.h>
+#include <libopencm3/stm32/rcc.h>
+#include <libopencm3/stm32/usart.h>
+#include <libopencm3/cm3/nvic.h>
+
 #include "std.h"
-#include "pprz_baudrate.h"
+
+#include BOARD_CONFIG
 
 void uart_periph_set_baudrate(struct uart_periph* p, uint32_t baud) {
 
   /* Configure USART */
-  USART_InitTypeDef usart;
-  usart.USART_BaudRate            = baud;
-  usart.USART_WordLength          = USART_WordLength_8b;
-  usart.USART_StopBits            = USART_StopBits_1;
-  usart.USART_Parity              = USART_Parity_No;
-  usart.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
-  usart.USART_Mode                = USART_Mode_Rx | USART_Mode_Tx;
-  USART_Init(p->reg_addr, &usart);
-  /* Enable USART1 Receive interrupts */
-  USART_ITConfig(p->reg_addr, USART_IT_RXNE, ENABLE);
+  usart_set_baudrate((u32)p->reg_addr, baud);
+  usart_set_databits((u32)p->reg_addr, 8);
+  usart_set_stopbits((u32)p->reg_addr, USART_STOPBITS_1);
+  usart_set_parity((u32)p->reg_addr, USART_PARITY_NONE);
 
-  pprz_usart_set_baudrate(p->reg_addr, baud);
+  /* Disable Idle Line interrupt */
+  USART_CR1((u32)p->reg_addr) &= ~USART_CR1_IDLEIE;
+
+  /* Disable LIN break detection interrupt */
+  USART_CR2((u32)p->reg_addr) &= ~USART_CR2_LBDIE;
+
+  /* Enable USART1 Receive interrupts */
+  USART_CR1((u32)p->reg_addr) |= USART_CR1_RXNEIE;
 
   /* Enable the USART */
-  USART_Cmd(p->reg_addr, ENABLE);
+  usart_enable((u32)p->reg_addr);
 
 }
-// TODO set_mode function
+
+void uart_periph_set_mode(struct uart_periph* p, bool_t tx_enabled, bool_t rx_enabled, bool_t hw_flow_control) {
+  u32 mode = 0;
+  if (tx_enabled)
+    mode |= USART_MODE_TX;
+  if (rx_enabled)
+    mode |= USART_MODE_RX;
+
+  /* set mode to Tx, Rx or TxRx */
+  usart_set_mode((u32)p->reg_addr, mode);
+
+  if (hw_flow_control) {
+    usart_set_flow_control((u32)p->reg_addr, USART_FLOWCONTROL_RTS_CTS);
+  }
+  else {
+    usart_set_flow_control((u32)p->reg_addr, USART_FLOWCONTROL_NONE);
+  }
+}
 
 void uart_transmit(struct uart_periph* p, uint8_t data ) {
 
@@ -59,7 +86,7 @@ void uart_transmit(struct uart_periph* p, uint8_t data ) {
   if (temp == p->tx_extract_idx)
     return;                          // no room
 
-  USART_ITConfig(p->reg_addr, USART_IT_TXE, DISABLE);
+  USART_CR1((u32)p->reg_addr) &= ~USART_CR1_TXEIE; // Disable TX interrupt
 
   // check if in process of sending data
   if (p->tx_running) { // yes, add to queue
@@ -68,184 +95,345 @@ void uart_transmit(struct uart_periph* p, uint8_t data ) {
   }
   else { // no, set running flag and write to output register
     p->tx_running = TRUE;
-    USART_SendData(p->reg_addr, data);
+    usart_send((u32)p->reg_addr, data);
   }
 
-  USART_ITConfig(p->reg_addr, USART_IT_TXE, ENABLE);
+  USART_CR1((u32)p->reg_addr) |= USART_CR1_TXEIE; // Enable TX interrupt
 
 }
 
-static inline void usart_irq_handler(struct uart_periph* p) {
+static inline void usart_isr(struct uart_periph* p) {
 
-  if(USART_GetITStatus(p->reg_addr, USART_IT_TXE) != RESET){
+  if (((USART_CR1((u32)p->reg_addr) & USART_CR1_TXEIE) != 0) &&
+      ((USART_SR((u32)p->reg_addr) & USART_SR_TXE) != 0)) {
     // check if more data to send
     if (p->tx_insert_idx != p->tx_extract_idx) {
-      USART_SendData(p->reg_addr,p->tx_buf[p->tx_extract_idx]);
+      usart_send((u32)p->reg_addr,p->tx_buf[p->tx_extract_idx]);
       p->tx_extract_idx++;
       p->tx_extract_idx %= UART_TX_BUFFER_SIZE;
     }
     else {
       p->tx_running = FALSE;   // clear running flag
-      USART_ITConfig(p->reg_addr, USART_IT_TXE, DISABLE);
+      USART_CR1((u32)p->reg_addr) &= ~USART_CR1_TXEIE; // Disable TX interrupt
     }
   }
 
-  if(USART_GetITStatus(p->reg_addr, USART_IT_RXNE) != RESET){
+  if (((USART_CR1((u32)p->reg_addr) & USART_CR1_RXNEIE) != 0) &&
+      ((USART_SR((u32)p->reg_addr) & USART_SR_RXNE) != 0) &&
+      ((USART_SR((u32)p->reg_addr) & USART_SR_ORE) == 0) &&
+      ((USART_SR((u32)p->reg_addr) & USART_SR_NE) == 0) &&
+      ((USART_SR((u32)p->reg_addr) & USART_SR_FE) == 0)) {
     uint16_t temp = (p->rx_insert_idx + 1) % UART_RX_BUFFER_SIZE;;
-    p->rx_buf[p->rx_insert_idx] = USART_ReceiveData(p->reg_addr);
+    p->rx_buf[p->rx_insert_idx] = usart_recv((u32)p->reg_addr);
     // check for more room in queue
     if (temp != p->rx_extract_idx)
       p->rx_insert_idx = temp; // update insert index
   }
-
+  else {
+    /* ORE, NE or FE error - read USART_DR reg and log the error */
+    if (((USART_CR1((u32)p->reg_addr) & USART_CR1_RXNEIE) != 0) &&
+        ((USART_SR((u32)p->reg_addr) & USART_SR_ORE) != 0)) {
+      usart_recv((u32)p->reg_addr);
+      p->ore++;
+    }
+    if (((USART_CR1((u32)p->reg_addr) & USART_CR1_RXNEIE) != 0) &&
+        ((USART_SR((u32)p->reg_addr) & USART_SR_NE) != 0)) {
+      usart_recv((u32)p->reg_addr);
+      p->ne_err++;
+    }
+    if (((USART_CR1((u32)p->reg_addr) & USART_CR1_RXNEIE) != 0) &&
+        ((USART_SR((u32)p->reg_addr) & USART_SR_FE) != 0)) {
+      usart_recv((u32)p->reg_addr);
+      p->fe_err++;
+    }
+  }
 }
 
-static inline void usart_enable_irq(IRQn_Type IRQn) {
+static inline void usart_enable_irq(u8 IRQn) {
+  /* Note:
+   * In libstm32 times the priority of this interrupt was set to
+   * preemption priority 2 and sub priority 1
+   */
   /* Enable USART interrupts */
-  NVIC_InitTypeDef nvic;
-  nvic.NVIC_IRQChannel = IRQn;
-  nvic.NVIC_IRQChannelPreemptionPriority = 2;
-  nvic.NVIC_IRQChannelSubPriority = 1;
-  nvic.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&nvic);
+  nvic_enable_irq(IRQn);
 }
+
 
 #ifdef USE_UART1
+
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART1_TX
+#define USE_UART1_TX TRUE
+#endif
+#ifndef USE_UART1_RX
+#define USE_UART1_RX TRUE
+#endif
+
+#ifndef UART1_HW_FLOW_CONTROL
+#define UART1_HW_FLOW_CONTROL FALSE
+#endif
 
 void uart1_init( void ) {
 
   uart_periph_init(&uart1);
-  uart1.reg_addr = USART1;
+  uart1.reg_addr = (void *)USART1;
 
-  /* init RCC */
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
-  RCC_APB2PeriphClockCmd(UART1_Periph, ENABLE);
+  /* init RCC and GPIOs */
+  rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_USART1EN);
 
-  /* Enable USART1 interrupts */
-  usart_enable_irq(USART1_IRQn);
+#if USE_UART1_TX
+  gpio_setup_pin_af(UART1_GPIO_PORT_TX, UART1_GPIO_TX, UART1_GPIO_AF, TRUE);
+#endif
+#if USE_UART1_RX
+  gpio_setup_pin_af(UART1_GPIO_PORT_RX, UART1_GPIO_RX, UART1_GPIO_AF, FALSE);
+#endif
 
-  /* Init GPIOS */
-  GPIO_InitTypeDef gpio;
-  /* GPIOA: GPIO_Pin_9 USART1 Tx push-pull */
-  gpio.GPIO_Pin   = UART1_TxPin;
-  gpio.GPIO_Mode  = GPIO_Mode_AF_PP;
-  gpio.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(UART1_TxPort, &gpio);
-  /* GPIOA: GPIO_Pin_10 USART1 Rx pin as floating input */
-  gpio.GPIO_Pin   = UART1_RxPin;
-  gpio.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(UART1_RxPort, &gpio);
+  /* Enable USART interrupts in the interrupt controller */
+  usart_enable_irq(NVIC_USART1_IRQ);
 
-  /* Configure USART1 */
+#if UART1_HW_FLOW_CONTROL
+#warning "USING UART1 FLOW CONTROL. Make sure to pull down CTS if you are not connecting any flow-control-capable hardware."
+  /* setup CTS and RTS gpios */
+  gpio_setup_pin_af(UART1_GPIO_PORT_CTS, UART1_GPIO_CTS, UART1_GPIO_AF, FALSE);
+  gpio_setup_pin_af(UART1_GPIO_PORT_RTS, UART1_GPIO_RTS, UART1_GPIO_AF, TRUE);
+#endif
+
+  /* Configure USART1, enable hardware flow control*/
+  uart_periph_set_mode(&uart1, USE_UART1_TX, USE_UART1_RX, UART1_HW_FLOW_CONTROL);
+
+  /* Set USART1 baudrate and enable interrupt */
   uart_periph_set_baudrate(&uart1, UART1_BAUD);
 }
 
-void usart1_irq_handler(void) { usart_irq_handler(&uart1); }
+void usart1_isr(void) { usart_isr(&uart1); }
 
 #endif /* USE_UART1 */
 
+
 #ifdef USE_UART2
+
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART2_TX
+#define USE_UART2_TX TRUE
+#endif
+#ifndef USE_UART2_RX
+#define USE_UART2_RX TRUE
+#endif
+
+#ifndef UART2_HW_FLOW_CONTROL
+#define UART2_HW_FLOW_CONTROL FALSE
+#endif
 
 void uart2_init( void ) {
 
   uart_periph_init(&uart2);
-  uart2.reg_addr = USART2;
+  uart2.reg_addr = (void *)USART2;
 
-  /* init RCC */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-  RCC_APB2PeriphClockCmd(UART2_Periph, ENABLE);
+  /* init RCC and GPIOs */
+  rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART2EN);
 
-  /* Enable USART2 interrupts */
-  usart_enable_irq(USART2_IRQn);
+#if USE_UART2_TX
+  gpio_setup_pin_af(UART2_GPIO_PORT_TX, UART2_GPIO_TX, UART2_GPIO_AF, TRUE);
+#endif
+#if USE_UART2_RX
+  gpio_setup_pin_af(UART2_GPIO_PORT_RX, UART2_GPIO_RX, UART2_GPIO_AF, FALSE);
+#endif
 
-  /* Init GPIOS */
-  GPIO_InitTypeDef gpio;
-  /* GPIOA: GPIO_Pin_2 USART2 Tx push-pull */
-  gpio.GPIO_Pin   = UART2_TxPin; // ;
-  gpio.GPIO_Mode  = GPIO_Mode_AF_PP;
-  gpio.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(UART2_TxPort, &gpio);
-  /* GPIOA: GPIO_Pin_3 USART2 Rx pin as floating input */
-  gpio.GPIO_Pin   = UART2_RxPin; // ;
-  gpio.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(UART2_RxPort, &gpio);
+  /* Enable USART interrupts in the interrupt controller */
+  usart_enable_irq(NVIC_USART2_IRQ);
 
-  /* Configure USART2 */
+#if UART2_HW_FLOW_CONTROL && defined(STM32F4)
+#warning "USING UART2 FLOW CONTROL. Make sure to pull down CTS if you are not connecting any flow-control-capable hardware."
+  /* setup CTS and RTS pins */
+  gpio_setup_pin_af(UART2_GPIO_PORT_CTS, UART2_GPIO_CTS, UART2_GPIO_AF, FALSE);
+  gpio_setup_pin_af(UART2_GPIO_PORT_RTS, UART2_GPIO_RTS, UART2_GPIO_AF, TRUE);
+#endif
+
+  /* Configure USART Tx,Rx, and hardware flow control*/
+  uart_periph_set_mode(&uart2, USE_UART2_TX, USE_UART2_RX, UART2_HW_FLOW_CONTROL);
+
+  /* Configure USART */
   uart_periph_set_baudrate(&uart2, UART2_BAUD);
 }
 
-void usart2_irq_handler(void) { usart_irq_handler(&uart2); }
+void usart2_isr(void) { usart_isr(&uart2); }
 
 #endif /* USE_UART2 */
 
+
 #ifdef USE_UART3
+
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART3_TX
+#define USE_UART3_TX TRUE
+#endif
+#ifndef USE_UART3_RX
+#define USE_UART3_RX TRUE
+#endif
+
+#ifndef UART3_HW_FLOW_CONTROL
+#define UART3_HW_FLOW_CONTROL FALSE
+#endif
 
 void uart3_init( void ) {
 
   uart_periph_init(&uart3);
-  uart3.reg_addr = USART3;
+  uart3.reg_addr = (void *)USART3;
 
   /* init RCC */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
-  RCC_APB2PeriphClockCmd(UART3_Periph, ENABLE);
+  rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_USART3EN);
 
-  /* Enable USART3 interrupts */
-  usart_enable_irq(USART3_IRQn);
+#if USE_UART3_TX
+  gpio_setup_pin_af(UART3_GPIO_PORT_TX, UART3_GPIO_TX, UART3_GPIO_AF, TRUE);
+#endif
+#if USE_UART3_RX
+  gpio_setup_pin_af(UART3_GPIO_PORT_RX, UART3_GPIO_RX, UART3_GPIO_AF, FALSE);
+#endif
 
-  /* Init GPIOS */
-  GPIO_PinRemapConfig(GPIO_PartialRemap_USART3, ENABLE);
-  GPIO_InitTypeDef gpio;
-  /* GPIOC: GPIO_Pin_10 USART3 Tx push-pull */
-  gpio.GPIO_Pin   = UART3_TxPin;
-  gpio.GPIO_Mode  = GPIO_Mode_AF_PP;
-  gpio.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(UART3_TxPort, &gpio);
-  /* GPIOC: GPIO_Pin_11 USART3 Rx pin as floating input */
-  gpio.GPIO_Pin   = UART3_RxPin;
-  gpio.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(UART3_RxPort, &gpio);
+  /* Enable USART interrupts in the interrupt controller */
+  usart_enable_irq(NVIC_USART3_IRQ);
 
-  /* Configure USART3 */
+#if UART3_HW_FLOW_CONTROL && defined(STM32F4)
+#warning "USING UART3 FLOW CONTROL. Make sure to pull down CTS if you are not connecting any flow-control-capable hardware."
+  /* setup CTS and RTS pins */
+  gpio_setup_pin_af(UART3_GPIO_PORT_CTS, UART3_GPIO_CTS, UART3_GPIO_AF, FALSE);
+  gpio_setup_pin_af(UART3_GPIO_PORT_RTS, UART3_GPIO_RTS, UART3_GPIO_AF, TRUE);
+#endif
+
+  /* Configure USART Tx,Rx, and hardware flow control*/
+  uart_periph_set_mode(&uart3, USE_UART3_TX, USE_UART3_RX, UART3_HW_FLOW_CONTROL);
+
+  /* Configure USART */
   uart_periph_set_baudrate(&uart3, UART3_BAUD);
 }
 
-void usart3_irq_handler(void) { usart_irq_handler(&uart3); }
+void usart3_isr(void) { usart_isr(&uart3); }
 
 #endif /* USE_UART3 */
 
+
+#if defined USE_UART4 && defined STM32F4
+
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART4_TX
+#define USE_UART4_TX TRUE
+#endif
+#ifndef USE_UART4_RX
+#define USE_UART4_RX TRUE
+#endif
+
+void uart4_init( void ) {
+
+  uart_periph_init(&uart4);
+  uart4.reg_addr = (void *)UART4;
+
+  /* init RCC and GPIOs */
+  rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_UART4EN);
+
+#if USE_UART4_TX
+  gpio_setup_pin_af(UART4_GPIO_PORT_TX, UART4_GPIO_TX, UART4_GPIO_AF, TRUE);
+#endif
+#if USE_UART4_RX
+  gpio_setup_pin_af(UART4_GPIO_PORT_RX, UART4_GPIO_RX, UART4_GPIO_AF, FALSE);
+#endif
+
+  /* Enable USART interrupts in the interrupt controller */
+  usart_enable_irq(NVIC_UART4_IRQ);
+
+  /* Configure USART */
+  uart_periph_set_mode(&uart4, USE_UART4_TX, USE_UART4_RX, FALSE);
+  uart_periph_set_baudrate(&uart4, UART4_BAUD);
+}
+
+void uart4_isr(void) { usart_isr(&uart4); }
+
+#endif /* USE_UART4 */
+
+
 #ifdef USE_UART5
+
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART5_TX
+#define USE_UART5_TX TRUE
+#endif
+#ifndef USE_UART5_RX
+#define USE_UART5_RX TRUE
+#endif
 
 void uart5_init( void ) {
 
   uart_periph_init(&uart5);
-  uart5.reg_addr = USART5;
+  uart5.reg_addr = (void *)UART5;
 
-  /* init RCC */
-  RCC_APB1PeriphClockCmd(RCC_APB1Periph_UART5, ENABLE);
-  RCC_APB2PeriphClockCmd(UART5_PeriphTx, ENABLE);
-  RCC_APB2PeriphClockCmd(UART5_PeriphRx, ENABLE);
+  /* init RCC and GPIOs */
+  rcc_peripheral_enable_clock(&RCC_APB1ENR, RCC_APB1ENR_UART5EN);
 
-  /* Enable UART5 interrupts */
-  usart_enable_irq(USART5_IRQn);
+#if USE_UART5_TX
+  gpio_setup_pin_af(UART5_GPIO_PORT_TX, UART5_GPIO_TX, UART5_GPIO_AF, TRUE);
+#endif
+#if USE_UART5_RX
+  gpio_setup_pin_af(UART5_GPIO_PORT_RX, UART5_GPIO_RX, UART5_GPIO_AF, FALSE);
+#endif
 
-  /* Init GPIOS */
-  GPIO_InitTypeDef gpio;
-  /* GPIOC: GPIO_Pin_10 UART5 Tx push-pull */
-  gpio.GPIO_Pin   = UART5_TxPin;
-  gpio.GPIO_Mode  = GPIO_Mode_AF_PP;
-  gpio.GPIO_Speed = GPIO_Speed_50MHz;
-  GPIO_Init(UART5_TxPort, &gpio);
-  /* GPIOC: GPIO_Pin_11 UART5 Rx pin as floating input */
-  gpio.GPIO_Pin   = UART5_RxPin;
-  gpio.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
-  GPIO_Init(UART5_RxPort, &gpio);
+  /* Enable USART interrupts in the interrupt controller */
+  usart_enable_irq(NVIC_UART5_IRQ);
 
-  /* Configure UART5 */
+  /* Configure USART */
+  uart_periph_set_mode(&uart5, USE_UART5_TX, USE_UART5_RX, FALSE);
   uart_periph_set_baudrate(&uart5, UART5_BAUD);
 }
 
-void usart5_irq_handler(void) { usart_irq_handler(&uart5); }
+void uart5_isr(void) { usart_isr(&uart5); }
 
 #endif /* USE_UART5 */
 
+
+#if defined USE_UART6 && defined STM32F4
+
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART6_TX
+#define USE_UART6_TX TRUE
+#endif
+#ifndef USE_UART6_RX
+#define USE_UART6_RX TRUE
+#endif
+
+#ifndef UART6_HW_FLOW_CONTROL
+#define UART6_HW_FLOW_CONTROL FALSE
+#endif
+
+void uart6_init( void ) {
+
+  uart_periph_init(&uart6);
+  uart6.reg_addr = (void *)USART6;
+
+  /* enable uart clock */
+  rcc_peripheral_enable_clock(&RCC_APB2ENR, RCC_APB2ENR_USART6EN);
+
+  /* init RCC and GPIOs */
+#if USE_UART6_TX
+  gpio_setup_pin_af(UART6_GPIO_PORT_TX, UART6_GPIO_TX, UART6_GPIO_AF, TRUE);
+#endif
+#if USE_UART6_RX
+  gpio_setup_pin_af(UART6_GPIO_PORT_RX, UART6_GPIO_RX, UART6_GPIO_AF, FALSE);
+#endif
+
+  /* Enable USART interrupts in the interrupt controller */
+  usart_enable_irq(NVIC_USART6_IRQ);
+
+#if UART6_HW_FLOW_CONTROL
+#warning "USING UART6 FLOW CONTROL. Make sure to pull down CTS if you are not connecting any flow-control-capable hardware."
+  /* setup CTS and RTS pins */
+  gpio_setup_pin_af(UART6_GPIO_PORT_CTS, UART6_GPIO_CTS, UART6_GPIO_AF, FALSE);
+  gpio_setup_pin_af(UART6_GPIO_PORT_RTS, UART6_GPIO_RTS, UART6_GPIO_AF, TRUE);
+#endif
+
+  /* Configure USART Tx,Rx and hardware flow control*/
+  uart_periph_set_mode(&uart6, USE_UART6_TX, USE_UART6_RX, UART6_HW_FLOW_CONTROL);
+
+  uart_periph_set_baudrate(&uart6, UART6_BAUD);
+}
+
+void usart6_isr(void) { usart_isr(&uart6); }
+
+#endif /* USE_UART6 */

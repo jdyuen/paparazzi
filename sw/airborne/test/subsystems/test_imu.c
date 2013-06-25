@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -43,7 +41,7 @@ static inline void main_init( void );
 static inline void main_periodic_task( void );
 static inline void main_event_task( void );
 
-static inline void on_gyro_accel_event(void);
+static inline void on_gyro_event(void);
 static inline void on_accel_event(void);
 static inline void on_mag_event(void);
 
@@ -71,7 +69,7 @@ static inline void main_init( void ) {
 static inline void led_toggle ( void ) {
 
 #ifdef BOARD_LISA_L
-      LED_TOGGLE(3);
+  LED_TOGGLE(7);
 #endif
 }
 
@@ -82,16 +80,27 @@ static inline void main_periodic_task( void ) {
     });
 #ifdef USE_I2C2
   RunOnceEvery(111, {
+      uint16_t i2c2_ack_fail_cnt          = i2c2.errors->ack_fail_cnt;
+      uint16_t i2c2_miss_start_stop_cnt   = i2c2.errors->miss_start_stop_cnt;
+      uint16_t i2c2_arb_lost_cnt          = i2c2.errors->arb_lost_cnt;
+      uint16_t i2c2_over_under_cnt        = i2c2.errors->over_under_cnt;
+      uint16_t i2c2_pec_recep_cnt         = i2c2.errors->pec_recep_cnt;
+      uint16_t i2c2_timeout_tlow_cnt      = i2c2.errors->timeout_tlow_cnt;
+      uint16_t i2c2_smbus_alert_cnt       = i2c2.errors->smbus_alert_cnt;
+      uint16_t i2c2_unexpected_event_cnt  = i2c2.errors->unexpected_event_cnt;
+      uint32_t i2c2_last_unexpected_event = i2c2.errors->last_unexpected_event;
+      const uint8_t _bus2 = 2;
       DOWNLINK_SEND_I2C_ERRORS(DefaultChannel, DefaultDevice,
-                   &i2c2.errors->ack_fail_cnt,
-                   &i2c2.errors->miss_start_stop_cnt,
-                   &i2c2.errors->arb_lost_cnt,
-                   &i2c2.errors->over_under_cnt,
-                   &i2c2.errors->pec_recep_cnt,
-                   &i2c2.errors->timeout_tlow_cnt,
-                   &i2c2.errors->smbus_alert_cnt,
-                   &i2c2.errors->unexpected_event_cnt,
-                   &i2c2.errors->last_unexpected_event);
+                               &i2c2_ack_fail_cnt,
+                               &i2c2_miss_start_stop_cnt,
+                               &i2c2_arb_lost_cnt,
+                               &i2c2_over_under_cnt,
+                               &i2c2_pec_recep_cnt,
+                               &i2c2_timeout_tlow_cnt,
+                               &i2c2_smbus_alert_cnt,
+                               &i2c2_unexpected_event_cnt,
+                               &i2c2_last_unexpected_event,
+                               &_bus2);
     });
 #endif
   if (sys_time.nb_sec > 1) imu_periodic();
@@ -100,8 +109,7 @@ static inline void main_periodic_task( void ) {
 
 static inline void main_event_task( void ) {
 
-  ImuEvent(on_gyro_accel_event, on_accel_event, on_mag_event);
-
+  ImuEvent(on_gyro_event, on_accel_event, on_mag_event);
 
 }
 
@@ -126,7 +134,7 @@ static inline void on_accel_event(void) {
   }
 }
 
-static inline void on_gyro_accel_event(void) {
+static inline void on_gyro_event(void) {
   ImuScaleGyro(imu);
 
   RunOnceEvery(50, LED_TOGGLE(2));

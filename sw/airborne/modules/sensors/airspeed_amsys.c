@@ -23,7 +23,7 @@
  */
 
 #include "sensors/airspeed_amsys.h"
-#include "estimator.h"
+#include "state.h"
 #include "mcu_periph/i2c.h"
 #include "mcu_periph/uart.h"
 #include "messages.h"
@@ -38,7 +38,7 @@
 //#endif
 #endif
 
-#define AIRSPEED_AMSYS_ADDR 0xF4 // original F0
+#define AIRSPEED_AMSYS_ADDR 0xE8 // original F0
 #ifndef AIRSPEED_AMSYS_SCALE
 #define AIRSPEED_AMSYS_SCALE 1
 #endif
@@ -99,14 +99,14 @@ void airspeed_amsys_read_periodic( void ) {
 #ifndef SITL
 	if (airspeed_amsys_i2c_trans.status == I2CTransDone)
 #ifndef MEASURE_AMSYS_TEMPERATURE
-		I2CReceive(AIRSPEED_AMSYS_I2C_DEV, airspeed_amsys_i2c_trans, AIRSPEED_AMSYS_ADDR, 2);
+		i2c_receive(&AIRSPEED_AMSYS_I2C_DEV, &airspeed_amsys_i2c_trans, AIRSPEED_AMSYS_ADDR, 2);
 #else
-		I2CReceive(AIRSPEED_AMSYS_I2C_DEV, airspeed_amsys_i2c_trans, AIRSPEED_AMSYS_ADDR, 4);
+		i2c_receive(&AIRSPEED_AMSYS_I2C_DEV, &airspeed_amsys_i2c_trans, AIRSPEED_AMSYS_ADDR, 4);
 #endif
 
 #else // SITL
 		extern float sim_air_speed;
-		EstimatorSetAirspeed(sim_air_speed);
+		stateSetAirspeed_f(&sim_air_speed);
 #endif //SITL
 }
 
@@ -146,7 +146,7 @@ void airspeed_amsys_read_event( void ) {
 		airspeed_old = airspeed_amsys;
 
 #if USE_AIRSPEED
-		EstimatorSetAirspeed(airspeed_amsys);
+		stateSetAirspeed_f(&airspeed_amsys);
 #endif
 #ifdef SENSOR_SYNC_SEND
 		DOWNLINK_SEND_AMSYS_AIRSPEED(DefaultChannel, DefaultDevice, &airspeed_amsys_raw, &pressure_amsys, &airspeed_tmp, &airspeed_amsys, &airspeed_temperature);

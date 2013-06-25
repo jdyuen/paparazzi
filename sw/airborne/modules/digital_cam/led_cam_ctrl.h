@@ -21,8 +21,8 @@
  */
 
 
-/** \file led_cam_ctrl.h
- *  \brief Digital Camera Control
+/** @file modules/digital_cam/led_cam_ctrl.h
+ *  @brief Digital Camera Control
  *
  * Provides the control of the shutter and the zoom of a digital camera
  * through standard binary IOs of the board.
@@ -30,13 +30,17 @@
  * Configuration:
  *  Since the API of led.h is used, connected pins must be defined as led
  *  numbers (usually in the airframe file):
- *   <define name="DC_SHUTTER_LED" value="6"/>
+ * @verbatim
+ *   <define name="DC_SHUTTER_LED" value="10"/>
  *   <define name="DC_ZOOM_IN_LED" value="7"/>
  *   <define name="DC_ZOOM_OUT_LED" value="8"/>
  *   <define name="DC_POWER_LED" value="9"/>
+ * @endverbatim
  *  Related bank and pin must also be defined:
- *   <define name="LED_6_BANK" value="0"/>
- *   <define name="LED_6_PIN" value="2"/>
+ * @verbatim
+ *   <define name="LED_10_BANK" value="0"/>
+ *   <define name="LED_10_PIN" value="2"/>
+ * @endverbatim
  *  The required initialization (dc_init()) and periodic (4Hz) process
  *
  */
@@ -51,15 +55,6 @@
 #include "led.h"
 
 extern uint8_t dc_timer;
-
-static inline void led_cam_ctrl_init(void)
-{
-  // Call common DC init
-  dc_init();
-
-  // Do LED specific DC init
-  dc_timer = 0;
-}
 
 #ifndef DC_PUSH
 #define DC_PUSH LED_ON
@@ -77,40 +72,36 @@ static inline void led_cam_ctrl_init(void)
 #error DC: Please specify at least a SHUTTER LED
 #endif
 
-/* Command The Camera */
-static inline void dc_send_command(uint8_t cmd)
+static inline void led_cam_ctrl_init(void)
 {
-  dc_timer = DC_SHUTTER_DELAY;
-  switch (cmd)
-  {
-    case DC_SHOOT:
-      DC_PUSH(DC_SHUTTER_LED);
-      dc_send_shot_position();
-      break;
+  // Call common DC init
+  dc_init();
+
+  // Do LED specific DC init
+  dc_timer = 0;
+
+  DC_RELEASE(DC_SHUTTER_LED);
 #ifdef DC_ZOOM_IN_LED
-    case DC_TALLER:
-      DC_PUSH(DC_ZOOM_IN_LED);
-      break;
+    DC_RELEASE(DC_ZOOM_IN_LED);
 #endif
 #ifdef DC_ZOOM_OUT_LED
-    case DC_WIDER:
-      DC_PUSH(DC_ZOOM_OUT_LED);
-      break;
+    DC_RELEASE(DC_ZOOM_OUT_LED);
 #endif
 #ifdef DC_POWER_LED
-    case DC_POWER:
-      DC_PUSH(DC_POWER_LED);
-      break;
+    DC_RELEASE(DC_POWER_LED);
 #endif
-    default:
-      break;
-  }
 }
 
 
 /* 4Hz Periodic */
 static inline void led_cam_ctrl_periodic( void )
 {
+#ifdef DC_SHOOT_ON_BUTTON_RELEASE
+  if (dc_timer==1) {
+    dc_send_shot_position();
+  }
+#endif
+
   if (dc_timer) {
     dc_timer--;
   } else {

@@ -6,11 +6,12 @@
      LEA 5H GPS
 -->
 
-<airframe name="Funjet">
+<airframe name="Weasel">
+
+  <autopilot name="fixedwing_autopilot.xml"/>
 
   <modules>
-    <load name="baro_board.xml"/>
-    <load name="airspeed_ads1114.xml"/>
+    <!--load name="airspeed_ads1114.xml"/-->
     <!--load name="mcp355x.xml"/-->
   </modules>
 
@@ -20,6 +21,7 @@
     <!--define name="AGR_CLIMB"/-->
     <define name="ALT_KALMAN"/>
     <define name="USE_AIRSPEED"/>
+    <!--define name="USE_BAROMETER"/-->
     <!--define name="LOITER_TRIM"/-->
     <!--define name="PITCH_TRIM"/-->
 
@@ -38,6 +40,7 @@
     <subsystem name="ahrs"    type="float_dcm">
       <define name="USE_HIGH_ACCEL_FLAG"/>
     </subsystem>
+    <subsystem name="ins" type="alt_float"/>
     <subsystem name="control" type="new"/>
     <subsystem name="navigation"/>
     <!-- Sensors -->
@@ -49,6 +52,7 @@
 
   <firmware name="setup">
     <target name="setup_actuators" board="umarim_1.0"/>
+    <target name="tunnel" board="umarim_1.0"/>
   </firmware>
 
 <!-- commands section -->
@@ -121,6 +125,7 @@
   <section name="INS" prefix="INS_">
     <define name="ROLL_NEUTRAL_DEFAULT" value="0.048" unit="rad"/>
     <define name="PITCH_NEUTRAL_DEFAULT" value="0." unit="rad"/>
+    <define name="BARO_SENS" value="1.0"/> <!-- TODO calibration -->
   </section>
 
   <section name="BAT">
@@ -132,7 +137,6 @@
     <define name="NOMINAL_AIRSPEED" value="15." unit="m/s"/>
     <define name="CARROT" value="5." unit="s"/>
     <define name="KILL_MODE_DISTANCE" value="(1.5*MAX_DIST_FROM_HOME)"/>
-    <define name="CONTROL_RATE" value="60" unit="Hz"/>
     <define name="ALT_KALMAN_ENABLED" value="TRUE"/>
 
     <define name="TRIGGER_DELAY" value="1."/>
@@ -146,14 +150,14 @@
     <!-- outer loop proportional gain -->
     <define name="ALTITUDE_PGAIN" value="0.159999996424"/> <!-- -0.024 -->
     <!-- outer loop saturation -->
-    <define name="ALTITUDE_MAX_CLIMB" value="5."/>
+    <define name="ALTITUDE_MAX_CLIMB" value="5." unit="m/s"/>
 
     <!-- Cruise throttle + limits -->
     <define name="AUTO_THROTTLE_NOMINAL_CRUISE_THROTTLE" value="0.5"/>
     <define name="AUTO_THROTTLE_MIN_CRUISE_THROTTLE" value="0.25"/>
     <define name="AUTO_THROTTLE_MAX_CRUISE_THROTTLE" value="0.85"/>
-    <define name="AUTO_PITCH_MAX_PITCH" value="RadOfDeg(20.)"/>
-    <define name="AUTO_PITCH_MIN_PITCH" value="-RadOfDeg(20.)"/>
+    <define name="AUTO_PITCH_MAX_PITCH" value="20." unit="deg"/>
+    <define name="AUTO_PITCH_MIN_PITCH" value="-20." unit="deg"/>
 
     <!-- Climb loop (throttle) -->
     <define name="AUTO_THROTTLE_CLIMB_THROTTLE_INCREMENT" value="0.1" unit="%/(m/s)"/>
@@ -175,11 +179,11 @@
     <define name="AUTO_AIRSPEED_PITCH_PGAIN" value="0.06"/>
     <define name="AUTO_AIRSPEED_PITCH_DGAIN" value="0.0"/>
     <define name="AUTO_AIRSPEED_PITCH_IGAIN" value="0.042"/>
-    <define name="AIRSPEED_MAX" value="30"/>
-    <define name="AIRSPEED_MIN" value="10"/>
+    <define name="AIRSPEED_MAX" value="30" unit="m/s"/>
+    <define name="AIRSPEED_MIN" value="10" unit="m/s"/>
 
     <!-- groundspeed control -->
-    <define name="AUTO_GROUNDSPEED_SETPOINT" value="15"/>
+    <define name="AUTO_GROUNDSPEED_SETPOINT" value="15" unit="m/s"/>
     <define name="AUTO_GROUNDSPEED_PGAIN" value="1."/>
     <define name="AUTO_GROUNDSPEED_IGAIN" value="0."/>
 
@@ -214,7 +218,6 @@
   </section>
 
   <section name="NAV">
-    <define name="NAV_PITCH" value="0."/>
     <define name="NAV_GLIDE_PITCH_TRIM" value="0"/>
   </section>
 

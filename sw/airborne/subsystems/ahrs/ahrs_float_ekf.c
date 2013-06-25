@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -164,8 +162,3 @@ void ahrs_propagate(void) {
 
 
 extern void ahrs_update(void);
-
-
-
-
-#endif /* AHRS_FLOAT_EKF_H */

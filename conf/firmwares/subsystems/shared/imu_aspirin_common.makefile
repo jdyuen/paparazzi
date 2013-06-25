@@ -2,25 +2,11 @@
 #
 # Common part for all Aspirin IMUs
 #
+# if ACCEL and GYRO SENS/NEUTRAL are not defined,
+# the defaults from the datasheet will be used
 #
 # required xml:
 #  <section name="IMU" prefix="IMU_">
-#
-#    <define name="GYRO_X_NEUTRAL" value="33924"/>
-#    <define name="GYRO_Y_NEUTRAL" value="33417"/>
-#    <define name="GYRO_Z_NEUTRAL" value="32809"/>
-#
-#    <define name="GYRO_X_SENS" value="1.01" integer="16"/>
-#    <define name="GYRO_Y_SENS" value="1.01" integer="16"/>
-#    <define name="GYRO_Z_SENS" value="1.01" integer="16"/>
-#
-#    <define name="ACCEL_X_NEUTRAL" value="32081"/>
-#    <define name="ACCEL_Y_NEUTRAL" value="33738"/>
-#    <define name="ACCEL_Z_NEUTRAL" value="32441"/>
-#
-#    <define name="ACCEL_X_SENS" value="2.50411474" integer="16"/>
-#    <define name="ACCEL_Y_SENS" value="2.48126183" integer="16"/>
-#    <define name="ACCEL_Z_SENS" value="2.51396167" integer="16"/>
 #
 #    <define name="MAG_X_NEUTRAL" value="2358"/>
 #    <define name="MAG_Y_NEUTRAL" value="2362"/>
@@ -34,31 +20,55 @@
 #
 #
 
-# imu aspirin
+IMU_ASPIRIN_CFLAGS  = -DIMU_TYPE_H=\"imu/imu_aspirin.h\"
+IMU_ASPIRIN_SRCS    = $(SRC_SUBSYSTEMS)/imu.c
+IMU_ASPIRIN_SRCS   += $(SRC_SUBSYSTEMS)/imu/imu_aspirin.c
+
+#IMU_ASPIRIN_SRCS   += $(SRC_ARCH)/subsystems/imu/imu_aspirin_arch.c
+IMU_ASPIRIN_CFLAGS += -DASPIRIN_ARCH_INDEP
+
+include $(CFG_SHARED)/spi_master.makefile
 
 # for fixedwing firmware and ap only
 ifeq ($(TARGET), ap)
-  IMU_ASPIRIN_CFLAGS  = -DUSE_IMU
+  IMU_ASPIRIN_CFLAGS  += -DUSE_IMU
 endif
 
-IMU_ASPIRIN_CFLAGS += -DIMU_TYPE_H=\"imu/imu_aspirin.h\"
-IMU_ASPIRIN_SRCS    = $(SRC_SUBSYSTEMS)/imu.c             \
-                      $(SRC_SUBSYSTEMS)/imu/imu_aspirin.c \
-                      $(SRC_ARCH)/subsystems/imu/imu_aspirin_arch.c
+# Accelerometer
+IMU_ASPIRIN_SRCS   += peripherals/adxl345_spi.c
+
+# Gyro
+IMU_ASPIRIN_SRCS   += peripherals/itg3200.c
 
 # Magnetometer
-IMU_ASPIRIN_SRCS   += peripherals/hmc5843.c $(SRC_ARCH)/peripherals/hmc5843_arch.c
-
-IMU_ASPIRIN_CFLAGS += -DUSE_I2C2
+#IMU_ASPIRIN_SRCS   += peripherals/hmc5843.c $(SRC_ARCH)/peripherals/hmc5843_arch.c
+IMU_ASPIRIN_SRCS   += peripherals/hmc58xx.c
 
 ifeq ($(ARCH), lpc21)
-#TODO
+IMU_ASPIRIN_CFLAGS += -DUSE_SPI_SLAVE0
+IMU_ASPIRIN_CFLAGS += -DASPIRIN_SPI_SLAVE_IDX=SPI_SLAVE0
+IMU_ASPIRIN_CFLAGS += -DASPIRIN_SPI_DEV=spi1
+IMU_ASPIRIN_CFLAGS += -DUSE_SPI1
+ifndef ASPIRIN_I2C_DEV
+ASPIRIN_I2C_DEV=i2c0
+endif
 else ifeq ($(ARCH), stm32)
-IMU_ASPIRIN_CFLAGS += -DUSE_EXTI15_10_IRQ  # Gyro Int on PC14
-IMU_ASPIRIN_CFLAGS += -DUSE_EXTI9_5_IRQ    # Mag Int on PB5
-IMU_ASPIRIN_CFLAGS += -DUSE_EXTI2_IRQ      # Accel Int on PD2
-IMU_ASPIRIN_CFLAGS += -DUSE_DMA1_C4_IRQ    # SPI2 Rx DMA
+IMU_ASPIRIN_CFLAGS += -DUSE_SPI2
+# Slave select configuration
+# SLAVE2 is on PB12 (NSS) (ADXL345 CS)
+IMU_ASPIRIN_CFLAGS += -DUSE_SPI_SLAVE2
+ifndef ASPIRIN_I2C_DEV
+ASPIRIN_I2C_DEV=i2c2
+endif
 endif
 
-sim.CFLAGS += $(IMU_ASPIRIN_CFLAGS) -DHMC5843_NO_IRQ
-sim.srcs   += $(IMU_ASPIRIN_SRCS)
+# convert i2cx to upper case
+ASPIRIN_I2C_DEV_UPPER=$(shell echo $(ASPIRIN_I2C_DEV) | tr a-z A-Z)
+
+IMU_ASPIRIN_CFLAGS += -DASPIRIN_I2C_DEV=$(ASPIRIN_I2C_DEV)
+IMU_ASPIRIN_CFLAGS += -DUSE_$(ASPIRIN_I2C_DEV_UPPER)
+
+#
+# NPS simulator
+#
+include $(CFG_SHARED)/imu_nps.makefile

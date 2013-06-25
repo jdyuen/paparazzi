@@ -13,24 +13,31 @@
     <define name="PITCH_TRIM"/>
     <define name="ALT_KALMAN"/>
 
-    <target name="ap" 			board="tiny_2.11"/>
-    <target name="sim" 			board="pc"/>
+    <target name="ap" 			        board="tiny_2.11"/>
+    <target name="sim" 			        board="pc"/>
 
     <subsystem name="radio_control" type="ppm"/>
     <subsystem name="telemetry"     type="transparent"/>
     <subsystem name="control"/>
-    <subsystem name="ahrs"      type="infrared"/>
+    <subsystem name="ahrs"          type="infrared"/>
+    <subsystem name="ins"           type="alt_float"/>
     <subsystem name="gps"           type="ublox"/>
     <subsystem name="navigation"/>
+
+    <!--subsystem name="spi">
+      <define name="USE_SPI_SLAVE0"/>
+      <define name="USE_SPI1"/>
+    </subsystem-->
   </firmware>
 
   <firmware name="setup">
-    <target name="tunnel" 		board="tiny_2.11" />
+    <target name="tunnel" 		      board="tiny_2.11" />
     <target name="setup_actuators" 	board="tiny_2.11" />
   </firmware>
 
   <modules>
     <load name="infrared_adc.xml"/>
+    <!--load name="ins_vn100.xml"/-->
   </modules>
 
 <!-- commands section -->
@@ -106,7 +113,6 @@
     <define name="MAXIMUM_AIRSPEED" value="18." unit="m/s"/>
     <define name="CARROT" value="5." unit="s"/>
     <define name="KILL_MODE_DISTANCE" value="(1.5*MAX_DIST_FROM_HOME)"/>
-    <define name="CONTROL_RATE" value="60" unit="Hz"/>
 <!--    <define name="XBEE_INIT" value="&quot;ATPL2\rATRN1\rATTT80\r&quot;"/> -->
 <!--    <define name="NO_XBEE_API_INIT" value="TRUE"/> -->
     <define name="ALT_KALMAN_ENABLED" value="FALSE"/>

@@ -23,8 +23,8 @@
  *  Read an attitude setpoint from the RC.
  */
 
-#ifndef STABILISATION_ATTITUDE_RC_SETPOINT_H
-#define STABILISATION_ATTITUDE_RC_SETPOINT_H
+#ifndef STABILIZATION_ATTITUDE_RC_SETPOINT_H
+#define STABILIZATION_ATTITUDE_RC_SETPOINT_H
 
 #include "std.h"
 #include "generated/airframe.h"
@@ -32,21 +32,8 @@
 #include "math/pprz_algebra_float.h"
 
 #include "subsystems/radio_control.h"
-#include "subsystems/ahrs.h"
+#include "state.h"
 
-#ifdef STABILISATION_ATTITUDE_TYPE_INT
-#define SP_MAX_PHI     (int32_t)ANGLE_BFP_OF_REAL(STABILIZATION_ATTITUDE_SP_MAX_PHI)
-#define SP_MAX_THETA   (int32_t)ANGLE_BFP_OF_REAL(STABILIZATION_ATTITUDE_SP_MAX_THETA)
-#define SP_MAX_R       (int32_t)ANGLE_BFP_OF_REAL(STABILIZATION_ATTITUDE_SP_MAX_R)
-#endif // STABILISATION_ATTITUDE_TYPE_INT
-
-#ifdef STABILISATION_ATTITUDE_TYPE_FLOAT
-#define SP_MAX_PHI   STABILIZATION_ATTITUDE_SP_MAX_PHI
-#define SP_MAX_THETA STABILIZATION_ATTITUDE_SP_MAX_THETA
-#define SP_MAX_R     STABILIZATION_ATTITUDE_SP_MAX_R
-#endif // STABILISATION_ATTITUDE_TYPE_FLOAT
-
-#define RC_UPDATE_FREQ 40
 
 #ifdef STABILIZATION_ATTITUDE_DEADBAND_A
 #define ROLL_DEADBAND_EXCEEDED()                                        \
@@ -68,22 +55,14 @@
   (radio_control.values[RADIO_YAW] >  STABILIZATION_ATTITUDE_DEADBAND_R || \
    radio_control.values[RADIO_YAW] < -STABILIZATION_ATTITUDE_DEADBAND_R)
 
-static inline void stabilization_attitude_read_rc_setpoint_eulers(struct Int32Eulers *sp, bool_t in_flight) {
+extern void stabilization_attitude_reset_care_free_heading(void);
+extern int32_t stabilization_attitude_get_heading_i(void);
+extern float stabilization_attitude_get_heading_f(void);
+extern void stabilization_attitude_read_rc_setpoint_eulers(struct Int32Eulers *sp, bool_t in_flight);
+extern void stabilization_attitude_read_rc_setpoint_eulers_f(struct FloatEulers *sp, bool_t in_flight);
+extern void stabilization_attitude_read_rc_roll_pitch_quat_f(struct FloatQuat* q);
+extern void stabilization_attitude_read_rc_roll_pitch_earth_quat_f(struct FloatQuat* q);
+extern void stabilization_attitude_read_rc_setpoint_quat_f(struct FloatQuat* q_sp, bool_t in_flight);
+extern void stabilization_attitude_read_rc_setpoint_quat_earth_bound_f(struct FloatQuat* q_sp, bool_t in_flight);
 
-  sp->phi = ((int32_t) radio_control.values[RADIO_ROLL]  * SP_MAX_PHI / MAX_PPRZ);
-  sp->theta = ((int32_t) radio_control.values[RADIO_PITCH] * SP_MAX_THETA / MAX_PPRZ);
-
-  if (in_flight) {
-    if (YAW_DEADBAND_EXCEEDED()) {
-      sp->psi += ((int32_t) radio_control.values[RADIO_YAW] * SP_MAX_R / MAX_PPRZ / RC_UPDATE_FREQ);
-      INT32_ANGLE_NORMALIZE(sp->psi);
-    }
-  }
-  else { /* if not flying, use current yaw as setpoint */
-    sp->psi = ahrs.ltp_to_body_euler.psi;
-  }
-
-}
-
-
-#endif /* STABILISATION_ATTITUDE_RC_SETPOINT_H */
+#endif /* STABILIZATION_ATTITUDE_RC_SETPOINT_H */

@@ -18,13 +18,13 @@
  * You should have received a copy of the GNU General Public License
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
+ * Boston, MA 02111-1307, USA.
  *
  */
 
 
 #define LPC21IAP_VER_MAJ    1
-#define LPC21IAP_VER_MIN    3
+#define LPC21IAP_VER_MIN    4
 
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -92,7 +92,7 @@ typedef struct
 
 static int SectorTable_214x[] = { 4096, 4096, 4096, 4096, 4096, 4096, 4096, 4096,
                                   32768, 32768, 32768, 32768, 32768, 32768, 32768, 32768,
-                                  32768, 32768, 32768, 32768, 32768, 32768, 
+                                  32768, 32768, 32768, 32768, 32768, 32768,
                                   4096, 4096, 4096, 4096, 4096 };
 
 static LPC_DEVICE LPCtypes[] =
@@ -119,8 +119,8 @@ int getSec(unsigned int adrFlash)
     int count;
     int temp = 0;
 
-    for (count=0; 
-         count < sizeof(SectorTable_214x)/sizeof(SectorTable_214x[0]); 
+    for (count=0;
+         count < sizeof(SectorTable_214x)/sizeof(SectorTable_214x[0]);
          count++)
     {
         temp += SectorTable_214x[count];
@@ -319,8 +319,8 @@ int main(int argc, char *argv[])
 
     /* calc maximum usable flash address */
     maxFlash = 0;
-    for (count=0; 
-         count < sizeof(SectorTable_214x)/sizeof(SectorTable_214x[0]); 
+    for (count=0;
+         count < sizeof(SectorTable_214x)/sizeof(SectorTable_214x[0]);
          count++)
     {
             maxFlash += SectorTable_214x[count];
@@ -337,9 +337,9 @@ int main(int argc, char *argv[])
         type  = ELFTypePSection(binElf, count);
         flag  = ELFFlagPSection(binElf, count);
 
-        if ((size > 0) && 
+        if ((size > 0) &&
             (src != 0) &&
-            (type & PT_LOAD) &&
+            (type == PT_LOAD) &&
             (flag & (PF_X | PF_W | PF_R)) &&
             (start+size <= maxFlash))
         {
@@ -386,7 +386,7 @@ int main(int argc, char *argv[])
 
         if ((size > 0) &&
             (src != 0) &&
-            (type & PT_LOAD) &&
+            (type == PT_LOAD) &&
             (flag & (PF_X | PF_W | PF_R)))
         {
 

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -71,12 +69,12 @@ static inline void main_periodic_task( void ) {
 }
 
 static inline void main_event_task( void ) {
-  if (max1168_status == STA_MAX1168_DATA_AVAILABLE) {
+  if (max1168_status == MAX1168_DATA_AVAILABLE) {
     RunOnceEvery(10, {
 	DOWNLINK_SEND_IMU_GYRO_RAW(DefaultChannel, DefaultDevice, &max1168_values[0], &max1168_values[1], &max1168_values[2]);
 	DOWNLINK_SEND_IMU_ACCEL_RAW(DefaultChannel, DefaultDevice, &max1168_values[3], &max1168_values[4], &max1168_values[6]);
 	DOWNLINK_SEND_BOOT(DefaultChannel, DefaultDevice, &max1168_values[7]); });
-    max1168_status = STA_MAX1168_IDLE;
+    max1168_status = MAX1168_IDLE;
   }
 }
 
@@ -110,6 +108,10 @@ static inline void main_event_task( void ) {
 #define SSP_DisableRti() ClearBit(SSPIMSC, RTIM);
 #define SSP_ClearRti()   SetBit(SSPICR, RTIC);
 
+#ifndef SSP_VIC_SLOT
+#define SSP_VIC_SLOT 7
+#endif
+
 
 static void main_init_ssp(void) {
 
@@ -126,9 +128,6 @@ static void main_init_ssp(void) {
   VICIntEnable = VIC_BIT( VIC_SPI1 );    /* enable it            */
   _VIC_CNTL(SSP_VIC_SLOT) = VIC_ENABLE | VIC_SPI1;
   _VIC_ADDR(SSP_VIC_SLOT) = (uint32_t)SSP_ISR;      /* address of the ISR   */
-
-
-
 
 }
 

@@ -128,13 +128,30 @@
 #define USE_AD1_2
 
 
+/* SPI slaves (IMU connector) */
+#define SPI_SELECT_SLAVE0_PORT 0
+#define SPI_SELECT_SLAVE0_PIN 20
+#define SPI_SELECT_SLAVE0_PINSEL PINSEL1
+#define SPI_SELECT_SLAVE0_PINSEL_BIT 8
+#define SPI_SELECT_SLAVE0_PINSEL_VAL 0
 
-/* MS2100 on SSP, IMU connector */
-#define MS2100_SS_PIN   28
-#define MS2100_SS_IODIR IO1DIR
-#define MS2100_SS_IOSET IO1SET
-#define MS2100_SS_IOCLR IO1CLR
+#define SPI_SELECT_SLAVE1_PORT 1
+#define SPI_SELECT_SLAVE1_PIN 28
+#define SPI_SELECT_SLAVE1_PINSEL PINSEL2
+#define SPI_SELECT_SLAVE1_PINSEL_BIT 2
+#define SPI_SELECT_SLAVE1_PINSEL_VAL 0
 
+
+/* MAX1168 EOC pin (booz2 imu) */
+#define MAX1168_EOC_PIN 16
+#define MAX1168_EOC_PINSEL PINSEL1
+#define MAX1168_EOC_PINSEL_BIT 0
+#define MAX1168_EOC_PINSEL_VAL 1
+#define MAX1168_EOC_EINT 0
+#define MAX1168_EOC_VIC_IT VIC_EINT0
+
+
+/* MS2100 EOC and reset pins (booz2 imu) */
 #define MS2100_RESET_PIN   19
 #define MS2100_RESET_IODIR IO1DIR
 #define MS2100_RESET_IOSET IO1SET
@@ -147,26 +164,24 @@
 #define MS2100_DRDY_EINT 3
 #define MS2100_DRDY_VIC_IT VIC_EINT3
 
-/* PWM5 on CAM connector */
-/* P0.21 */
-#define PWM0_PINSEL PINSEL1
-#define PWM0_PINSEL_VAL 0x01
-#define PWM0_PINSEL_BIT 10
 
-/* PWM2 on SPI connector */
-/* P0.7 */
-#define PWM1_PINSEL PINSEL0
-#define PWM1_PINSEL_VAL 0x02
-#define PWM1_PINSEL_BIT 14
+/* Servo definition for actruators_pwm driver */
+
+/* BOOZ PWM0 = PWM_SERVO_5 (driver) = PWM5 (lpc)
+ * on CAM connector */
+#if USE_PWM0
+#define PWM_SERVO_5 1
+#define SERVO_REG_0 PWMMR5
+#endif
+
+/* BOOZ PWM1 = PWM_SERVO_2 (driver) = PWM2 (lpc)
+ * on SPI connector */
+#if USE_PWM1
+#define PWM_SERVO_2 1
+#define SERVO_REG_1 PWMMR2
+#endif
 
 
 #define BOARD_HAS_BARO 1
-
-/*
- * Modem
- */
-//#define MODEM_DEVICE Uart1
-//#define MODEM_UART_FLAG
-
 
 #endif /* CONFIG_BOOZ2_V1_0_H */

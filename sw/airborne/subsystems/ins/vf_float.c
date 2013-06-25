@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -21,6 +19,13 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file subsystems/ins/vf_float.c
+ *
+ * Vertical filter (in float) estimating altitude, velocity and accel bias.
+ *
+ */
+
 #include "subsystems/ins/vf_float.h"
 
 /*
@@ -32,14 +37,25 @@ temps :
   update    46us
 
 */
-/* initial covariance diagonal */
-#define INIT_PXX 1.
-/* process noise */
-#define ACCEL_NOISE 0.5
-#define Qzz       ACCEL_NOISE/512./512./2.
-#define Qzdotzdot ACCEL_NOISE/512.
+/* initial error covariance diagonal */
+#ifndef VF_FLOAT_INIT_PXX
+#define VF_FLOAT_INIT_PXX 1.0
+#endif
+
+/* process noise covariance Q */
+#ifndef VF_FLOAT_ACCEL_NOISE
+#define VF_FLOAT_ACCEL_NOISE 0.5
+#endif
+
+/* measurement noise covariance R */
+#ifndef VF_FLOAT_MEAS_NOISE
+#define VF_FLOAT_MEAS_NOISE 1.0
+#endif
+
+/* default parameters */
+#define Qzz       VF_FLOAT_ACCEL_NOISE * DT_VFILTER * DT_VFILTER / 2.
+#define Qzdotzdot VF_FLOAT_ACCEL_NOISE * DT_VFILTER
 #define Qbiasbias 1e-7
-#define R 1.
 
 float vff_z;
 float vff_bias;
@@ -58,7 +74,7 @@ void vff_init(float init_z, float init_zdot, float init_bias) {
   for (i=0; i<VFF_STATE_SIZE; i++) {
     for (j=0; j<VFF_STATE_SIZE; j++)
       vff_P[i][j] = 0.;
-    vff_P[i][i] = INIT_PXX;
+    vff_P[i][i] = VF_FLOAT_INIT_PXX;
   }
 
 }
@@ -82,11 +98,11 @@ void vff_init(float init_z, float init_zdot, float init_bias) {
 
 */
 void vff_propagate(float accel) {
-  /* update state */
+  /* update state (Xk1) */
   vff_zdotdot = accel + 9.81 - vff_bias;
   vff_z = vff_z + DT_VFILTER * vff_zdot;
   vff_zdot = vff_zdot + DT_VFILTER * vff_zdotdot;
-  /* update covariance */
+  /* update covariance (Pk1) */
   const float FPF00 = vff_P[0][0] + DT_VFILTER * ( vff_P[1][0] + vff_P[0][1] + DT_VFILTER * vff_P[1][1] );
   const float FPF01 = vff_P[0][1] + DT_VFILTER * ( vff_P[1][1] - vff_P[0][2] - DT_VFILTER * vff_P[1][2] );
   const float FPF02 = vff_P[0][2] + DT_VFILTER * ( vff_P[1][2] );
@@ -122,7 +138,7 @@ void vff_propagate(float accel) {
   // update covariance
   Pp = Pm - K*H*Pm;
 */
-__attribute__ ((always_inline)) static inline void update_z_conf(float z_meas, float conf) {
+static inline void update_z_conf(float z_meas, float conf) {
   vff_z_meas = z_meas;
 
   const float y = z_meas - vff_z;
@@ -158,7 +174,7 @@ __attribute__ ((always_inline)) static inline void update_z_conf(float z_meas, f
 }
 
 void vff_update(float z_meas) {
-  update_z_conf(z_meas, R);
+  update_z_conf(z_meas, VF_FLOAT_MEAS_NOISE);
 }
 
 void vff_update_z_conf(float z_meas, float conf) {
@@ -179,7 +195,7 @@ void vff_update_z_conf(float z_meas, float conf) {
   // update covariance
   Pp = Pm - K*H*Pm;
 */
-__attribute__ ((always_inline)) static inline void update_vz_conf(float vz, float conf) {
+static inline void update_vz_conf(float vz, float conf) {
   const float yd = vz - vff_zdot;
   const float S = vff_P[1][1] + conf;
   const float K1 = vff_P[0][1] * 1/S;

@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -20,12 +18,6 @@
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
-
-#include <stm32/rcc.h>
-#include <stm32/gpio.h>
-
-#include <stm32/flash.h>
-#include <stm32/misc.h>
 
 #include BOARD_CONFIG
 #include "mcu.h"
@@ -55,12 +47,12 @@ static inline void main_init( void ) {
 static inline void main_periodic( void ) {
   char ch;
 
-  Uart1Transmit('a');
-  Uart2Transmit('b');
-  Uart3Transmit('c');
+  uart_transmit(&uart1, 'a');
+  uart_transmit(&uart2, 'b');
+  uart_transmit(&uart3, 'c');
 
-  if (Uart1ChAvailable()) {
-	ch = Uart1Getch();
+  if (uart_char_available(&uart1)) {
+	ch = uart_getch(&uart1);
 	if (ch == 'a') {
 		LED_OFF(0);
 		LED_ON(1);
@@ -73,8 +65,8 @@ static inline void main_periodic( void ) {
 		LED_OFF(1);
   }
 
-  if (Uart2ChAvailable()) {
-	ch = Uart2Getch();
+  if (uart_char_available(&uart2)) {
+	ch = uart_getch(&uart2);
 	if (ch == 'b') {
 		LED_OFF(2);
 		LED_ON(3);
@@ -87,8 +79,8 @@ static inline void main_periodic( void ) {
 		LED_OFF(3);
   }
 
-  if (Uart3ChAvailable()) {
-	ch = Uart3Getch();
+  if (uart_char_available(&uart3)) {
+	ch = uart_getch(&uart3);
 	if (ch == 'c') {
 		LED_OFF(4);
 		LED_ON(5);

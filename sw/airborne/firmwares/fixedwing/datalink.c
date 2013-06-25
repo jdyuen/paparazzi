@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005  Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -19,12 +17,14 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
+ */
+
+/**
+ * @file firmwares/fixedwing/datalink.c
+ * Handling of messages coming from ground and other A/Cs.
  *
  */
-/** \file datalink.c
- *  \brief Handling of messages coming from ground and other A/Cs
- *
- */
+
 #define DATALINK_C
 
 #define MODULES_DATALINK_C
@@ -40,12 +40,8 @@
 #endif // TRAFFIC_INFO
 
 #if defined NAV || defined WIND_INFO
-#include "estimator.h"
+#include "state.h"
 #include "subsystems/nav.h"
-#endif
-
-#if USE_JOYSTICK
-#include "joystick.h"
 #endif
 
 #ifdef HITL
@@ -63,6 +59,21 @@
 #include "mcu_periph/uart.h"
 #include "subsystems/datalink/downlink.h"
 #include "ap_downlink.h"
+
+
+#if USE_JOYSTICK
+#include "firmwares/fixedwing/stabilization/stabilization_attitude.h"
+#include "autopilot.h"
+uint8_t joystick_block;
+#define JoystickHandeDatalink(_roll_int8, _pitch_int8, _throttle_int8) { \
+    if (pprz_mode == PPRZ_MODE_AUTO2 && nav_block == joystick_block) {  \
+      h_ctl_roll_setpoint = _roll_int8 * (AUTO1_MAX_ROLL / 0x7f);       \
+      h_ctl_pitch_setpoint = _pitch_int8 * (AUTO1_MAX_PITCH / 0x7f);    \
+      v_ctl_throttle_setpoint = (MAX_PPRZ/0x7f) * _throttle_int8;       \
+    }                                                                   \
+  }
+#endif
+
 
 #define MOfCm(_x) (((float)(_x))/100.)
 
@@ -134,13 +145,16 @@ void dl_parse_msg(void) {
 #endif /** NAV */
 #ifdef WIND_INFO
   if (msg_id == DL_WIND_INFO && DL_WIND_INFO_ac_id(dl_buffer) == AC_ID) {
-    wind_east = DL_WIND_INFO_east(dl_buffer);
-    wind_north = DL_WIND_INFO_north(dl_buffer);
+    struct FloatVect2 wind;
+    wind.x = DL_WIND_INFO_north(dl_buffer);
+    wind.y = DL_WIND_INFO_east(dl_buffer);
+    stateSetHorizontalWindspeed_f(&wind);
 #if !USE_AIRSPEED
-    estimator_airspeed = DL_WIND_INFO_airspeed(dl_buffer);
+    float airspeed = DL_WIND_INFO_airspeed(dl_buffer);
+    stateSetAirspeed_f(&airspeed);
 #endif
 #ifdef WIND_INFO_RET
-    DOWNLINK_SEND_WIND_INFO_RET(DefaultChannel, DefaultDevice, &wind_east, &wind_north, &estimator_airspeed);
+    DOWNLINK_SEND_WIND_INFO_RET(DefaultChannel, DefaultDevice, &wind.y, &wind.x, stateGetAirspeed_f());
 #endif
   } else
 #endif /** WIND_INFO */
@@ -181,8 +195,8 @@ void dl_parse_msg(void) {
 #if USE_JOYSTICK
     if (msg_id == DL_JOYSTICK_RAW && DL_JOYSTICK_RAW_ac_id(dl_buffer) == AC_ID) {
       JoystickHandeDatalink(DL_JOYSTICK_RAW_roll(dl_buffer),
-			    DL_JOYSTICK_RAW_pitch(dl_buffer),
-			    DL_JOYSTICK_RAW_throttle(dl_buffer));
+                DL_JOYSTICK_RAW_pitch(dl_buffer),
+                DL_JOYSTICK_RAW_throttle(dl_buffer));
     } else
 #endif // USE_JOYSTICK
 #if defined RADIO_CONTROL && defined RADIO_CONTROL_TYPE_DATALINK

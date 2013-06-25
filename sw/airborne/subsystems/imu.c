@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2010 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -21,7 +19,8 @@
  * Boston, MA 02111-1307, USA.
  */
 
-/** @file imu.c
+/**
+ * @file subsystems/imu.c
  * Inertial Measurement Unit interface.
  */
 
@@ -39,7 +38,9 @@ void imu_init(void) {
 #if defined IMU_MAG_X_NEUTRAL && defined IMU_MAG_Y_NEUTRAL && defined IMU_MAG_Z_NEUTRAL
   VECT3_ASSIGN(imu.mag_neutral,   IMU_MAG_X_NEUTRAL,   IMU_MAG_Y_NEUTRAL,   IMU_MAG_Z_NEUTRAL);
 #else
-#pragma message "Info: Magnetomter neutrals are set to zero!"
+#if USE_MAGNETOMETER
+INFO("Magnetometer neutrals are set to zero, you should calibrate!")
+#endif
   INT_VECT3_ZERO(imu.mag_neutral);
 #endif
 

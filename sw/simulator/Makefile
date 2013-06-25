@@ -1,4 +1,4 @@
-# Paparazzi simulator $Id$
+# Hey Emacs, this is a -*- makefile -*-
 #
 # Copyright (C) 2003-2006  Pascal Brisset, Antoine Drouin
 #
@@ -22,14 +22,14 @@
 # Quiet compilation
 Q=@
 
-LBITS := $(shell getconf LONG_BIT)
-ifeq ($(LBITS),64)
-  FPIC = -ccopt -fPIC
-else
-  FPIC =
-endif
 
 include ../../conf/Makefile.local
+include ../Makefile.ocaml
+
+OCAMLC += -g
+INCLUDES =
+PKG = -package glibivy,pprz
+LINKPKG = $(PKG) -linkpkg -dllpath-pkg pprz
 
 SIMML = stdlib.ml data.ml flightModel.ml gps.ml
 SIMHML = $(SIMML) hitl.ml sim.ml
@@ -38,70 +38,72 @@ SIMSML = $(SIMML) sitl.ml sim.ml
 SIMSCMO=$(SIMSML:%.ml=%.cmo)
 SIMSCMX=$(SIMSML:%.ml=%.cmx)
 
-
-OCAMLC = ocamlc -g
-OCAMLOPT=ocamlopt
-OCAML=$(shell which ocaml)
-OCAMLRUN=$(shell which ocamlrun)
-INCLUDES= $(shell ocamlfind query -r -i-format lablgtk2) -I ../lib/ocaml $(shell ocamlfind query -r -i-format xml-light)
-
 AIRBORNE = ../airborne
 VARINCLUDE=$(PAPARAZZI_HOME)/var/include
 ACINCLUDE = $(PAPARAZZI_HOME)/var/$(AIRCRAFT)
-LAUNCHSITL = launchsitl
 
-all : gaia sitl.cma $(LAUNCHSITL) simhitl
-	@chmod a+x $(LAUNCHSITL)
+UNAME = $(shell uname -s)
+ifeq ("$(UNAME)","Darwin")
+	CAML_CFLAGS = -I $(shell $(OCAMLC) -where)
+else
+	CAML_CFLAGS =
+endif
 
-simhitl : fg.o $(SIMHCMO) simhitl.cmo
+
+all : gaia sitl.cma simhitl
+
+fg.so : fg.o
+	@echo BUILD $@
+	$(Q)$(CC) -shared -o $@ $^
+
+simhitl : fg.so $(SIMHCMO) simhitl.cmo
 	@echo OL $@
-	$(Q)$(OCAMLC) -custom $(INCLUDES) -o $@ str.cma xml-light.cma unix.cma glibivy-ocaml.cma lib-pprz.cma lablgtk.cma gtkInit.cmo $^
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) gtkInit.cmo $<
 
 sitl.cma : fg.o $(SIMSCMO)
 	@echo OL $@
-	$(Q)ocamlmklib -o sitl $^
+	$(Q)$(OCAMLMKLIB) -o sitl $^
 
 sitl.cmxa : $(SIMSCMX)
-	ocamlopt -o $@ -a $^
+	@echo OC $@
+	$(Q)$(OCAMLOPT) -o $@ -a $^
 
 gaia : gaia.cmo
 	@echo OL $@
-	$(Q)$(OCAMLC) -custom $(INCLUDES) -o $@ unix.cma str.cma xml-light.cma glibivy-ocaml.cma lib-pprz.cma lablgtk.cma gtkInit.cmo $<
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) gtkInit.cmo $<
 
 diffusion : stdlib.cmo diffusion.cmo
 	@echo OL $@
-	$(Q)$(OCAMLC) -custom $(INCLUDES) -o $@ unix.cma str.cma xml-light.cma glibivy-ocaml.cma lib-pprz.cma lablgtk.cma gtkInit.cmo $^
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) gtkInit.cmo $^
 
-%.cmo : %.ml ../lib/ocaml/lib-pprz.cma
+%.cmo : %.ml
 	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(INCLUDES) -c $(PKG) $<
 
 %.o : %.c
-	@echo OC $<
-	$(Q)$(OCAMLC) $(FPIC) -c $<
+	@echo CC $<
+	$(Q)$(CC) -fPIC -c $< $(CAML_CFLAGS)
 
 %.cmx : %.ml
 	@echo OOC $<
-	$(Q)$(OCAMLOPT) $(INCLUDES) -c $<
+	$(Q)$(OCAMLOPT) $(INCLUDES) -c $(PKG) $<
 
-%.cmi : %.mli ../lib/ocaml/lib-pprz.cma
+%.cmi : %.mli
 	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(INCLUDES) -c $(PKG) $<
 
 clean :
-	rm -f *.cm* *~ *.out .depend *.o *.a *.so gaia simhitl booz_sim test2
+	$(Q)rm -f *.cm* *~ *.out .depend *.o *.a *.so gaia simhitl diffusion
 
-launchsitl :
-	cat ../../src/$(@F) | sed s#OCAMLRUN#$(OCAMLRUN)# | sed s#OCAML#$(OCAML)# > $@
-	chmod a+x $@
+.PHONY: all clean
 
 
 #
 # Dependencies
 #
 
-.depend:
-	ocamldep *.ml* > .depend
+.depend: Makefile
+	$(OCAMLDEP) -I $(LIBPPRZDIR) *.ml* > .depend
 
 ifneq ($(MAKECMDGOALS),clean)
 -include .depend

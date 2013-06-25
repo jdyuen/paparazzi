@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2007  ENAC
  *
  * This file is part of paparazzi.
@@ -22,8 +20,9 @@
  *
  */
 
-/** \file baro_MS5534A.h
- *  \brief Handling of the MS5534a pressure sensor
+/**
+ * @file modules/sensors/baro_MS5534A.h
+ * @brief Handling of the MS5534a pressure sensor
  *
  */
 
@@ -54,6 +53,8 @@ void baro_MS5534A_send(void);
 void baro_MS5534A_event_task( void );
 
 void baro_MS5534A_event( void );
+
+#define BaroMS5534AUpdate(_b) { if (baro_MS5534A_available) { _b = baro_MS5534A_pressure; baro_MS5534A_available = FALSE; } }
 
 #endif // USE_BARO_MS5534A
 

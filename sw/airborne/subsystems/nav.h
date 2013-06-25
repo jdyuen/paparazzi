@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2003-2009  ENAC, Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -19,14 +17,15 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
- *
  */
 
-/** \file nav.h
- *  \brief Navigation library
+/**
+ * @file subsystems/nav.h
+ *
+ * Fixedwing Navigation library.
  *
  * This collection of macros and functions is used by the C code generated
- * from the XML flight plan
+ * from the XML flight plan.
  */
 
 #ifndef NAV_H
@@ -34,7 +33,10 @@
 
 #include "std.h"
 #include "paparazzi.h"
-#include "firmwares/fixedwing/guidance/guidance_v.h"
+#include "state.h"
+#ifdef CTRL_TYPE_H
+#include CTRL_TYPE_H
+#endif
 #include "subsystems/navigation/nav_survey_rectangle.h"
 #include "subsystems/navigation/common_flight_plan.h"
 #include "subsystems/navigation/common_nav.h"
@@ -59,6 +61,7 @@ extern float fp_pitch; /* Degrees */
 extern float carrot_x, carrot_y;
 
 extern float nav_circle_radians; /* Cumulated */
+extern float nav_circle_radians_no_rewind; /* Cumulated */
 extern bool_t nav_in_circle;
 extern bool_t nav_in_segment;
 extern float nav_circle_x, nav_circle_y, nav_circle_radius; /* m */
@@ -121,6 +124,7 @@ extern void nav_circle_XY(float x, float y, float radius);
   while (x >= 360 && ++dont_loop_forever) x -= 360; \
 }
 
+#define NavCircleCountNoRewind() (nav_circle_radians_no_rewind / (2*M_PI))
 #define NavCircleCount() (fabs(nav_circle_radians) / (2*M_PI))
 #define NavCircleQdr() ({ float qdr = DegOfRad(M_PI_2 - nav_circle_trigo_qdr); NormCourse(qdr); qdr; })
 
@@ -129,7 +133,7 @@ extern void nav_circle_XY(float x, float y, float radius);
 /** True if x (in degrees) is close to the current QDR (less than 10 degrees)*/
 #define NavQdrCloseTo(x) CloseDegAngles(x, NavCircleQdr())
 
-#define NavCourseCloseTo(x) CloseDegAngles(x, DegOfRad(estimator_hspeed_dir))
+#define NavCourseCloseTo(x) CloseDegAngles(x, DegOfRad(*stateGetHorizontalSpeedDir_f()))
 
 /*********** Navigation along a line *************************************/
 extern void nav_route_xy(float last_wp_x, float last_wp_y, float wp_x, float wp_y);
@@ -191,4 +195,9 @@ bool_t nav_approaching_xy(float x, float y, float from_x, float from_y, float ap
 #define nav_SetNavRadius(x) { if (x==1) nav_radius = DEFAULT_CIRCLE_RADIUS; else if (x==-1) nav_radius = -DEFAULT_CIRCLE_RADIUS; else nav_radius = x; }
 
 #define NavKillThrottle() { kill_throttle = 1; }
+
+#define GetPosX() (stateGetPositionUtm_f()->north)
+#define GetPosY() (stateGetPositionUtm_f()->east)
+#define GetPosAlt() (stateGetPositionUtm_f()->alt)
+
 #endif /* NAV_H */

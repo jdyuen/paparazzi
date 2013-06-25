@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2003-2005  Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -75,6 +73,11 @@ static inline void led_init ( void ) {
   LED_INIT(8);
   LED_OFF(8);
 #endif /* LED_8 */
+
+#ifdef USE_LED_BODY
+  LED_INIT(BODY);
+  LED_OFF(BODY);
+#endif /* LED_BODY */
 
 #if USE_LED_12
   LED_INIT(12);

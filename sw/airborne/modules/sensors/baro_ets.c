@@ -1,19 +1,4 @@
 /*
- * Driver for the EagleTree Systems Altitude Sensor
- * Has only been tested with V3 of the sensor hardware
- *
- * Notes:
- * Connect directly to TWOG/Tiny I2C port. Multiple sensors can be chained together.
- * Sensor should be in the proprietary mode (default) and not in 3rd party mode.
- * Pitch gains may need to be updated.
- *
- *
- * Sensor module wire assignments:
- * Red wire: 5V
- * White wire: Ground
- * Yellow wire: SDA
- * Brown wire: SCL
- *
  * Copyright (C) 2009 Vassilis Varveropoulos
  * Copyright (C) 2010 The Paparazzi Team
  *
@@ -35,9 +20,28 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file baro_ets.c
+ *
+ * Driver for the EagleTree Systems Altitude Sensor.
+ * Has only been tested with V3 of the sensor hardware.
+ *
+ * Notes:
+ * Connect directly to TWOG/Tiny I2C port. Multiple sensors can be chained together.
+ * Sensor should be in the proprietary mode (default) and not in 3rd party mode.
+ * Pitch gains may need to be updated.
+ *
+ *
+ * Sensor module wire assignments:
+ * Red wire: 5V
+ * White wire: Ground
+ * Yellow wire: SDA
+ * Brown wire: SCL
+ */
+
 #include "sensors/baro_ets.h"
 #include "mcu_periph/i2c.h"
-#include "estimator.h"
+#include "state.h"
 #include <math.h>
 
 #include "subsystems/nav.h"
@@ -46,9 +50,21 @@
 #include "subsystems/gps.h"
 #endif
 
+#ifdef BARO_ETS_TELEMETRY
+#ifndef DOWNLINK_DEVICE
+#define DOWNLINK_DEVICE DOWNLINK_AP_DEVICE
+#endif
+
+#include "mcu_periph/uart.h"
+#include "messages.h"
+#include "subsystems/datalink/downlink.h"
+#endif //BARO_ETS_TELEMETRY
+
 #define BARO_ETS_ADDR 0xE8
 #define BARO_ETS_REG 0x07
+#ifndef BARO_ETS_SCALE
 #define BARO_ETS_SCALE 0.32
+#endif
 #define BARO_ETS_OFFSET_MAX 30000
 #define BARO_ETS_OFFSET_MIN 10
 #define BARO_ETS_OFFSET_NBSAMPLES_INIT 20
@@ -95,26 +111,22 @@ void baro_ets_read_periodic( void ) {
   // Initiate next read
 #ifndef SITL
   if (baro_ets_i2c_trans.status == I2CTransDone)
-    I2CReceive(BARO_ETS_I2C_DEV, baro_ets_i2c_trans, BARO_ETS_ADDR, 2);
+    i2c_receive(&BARO_ETS_I2C_DEV, &baro_ets_i2c_trans, BARO_ETS_ADDR, 2);
 #else // SITL
-  baro_ets_adc = 0;
+  /* fake an offset so sim works for under hmsl as well */
+  if (!baro_ets_offset_init) {
+    baro_ets_offset = 12400;
+    baro_ets_offset_init = TRUE;
+  }
   baro_ets_altitude = gps.hmsl / 1000.0;
+  baro_ets_adc = baro_ets_offset - ((baro_ets_altitude - ground_alt) / BARO_ETS_SCALE);
   baro_ets_valid = TRUE;
-  EstimatorSetAlt(baro_ets_altitude);
 #endif
-}
 
 #ifdef BARO_ETS_TELEMETRY
-
-#ifndef DOWNLINK_DEVICE
-#define DOWNLINK_DEVICE DOWNLINK_AP_DEVICE
+  DOWNLINK_SEND_BARO_ETS(DefaultChannel, DefaultDevice, &baro_ets_adc, &baro_ets_offset, &baro_ets_altitude);
 #endif
-
-#include "mcu_periph/uart.h"
-#include "messages.h"
-#include "subsystems/datalink/downlink.h"
-
-#endif
+}
 
 void baro_ets_read_event( void ) {
   // Get raw altimeter from buffer
@@ -149,7 +161,6 @@ void baro_ets_read_event( void ) {
     if (baro_ets_offset_init) {
       baro_ets_altitude = ground_alt + BARO_ETS_SCALE * (float)(baro_ets_offset-baro_ets_adc);
       // New value available
-      EstimatorSetAlt(baro_ets_altitude);
 #ifdef BARO_ETS_TELEMETRY
       DOWNLINK_SEND_BARO_ETS(DefaultChannel, DefaultDevice, &baro_ets_adc, &baro_ets_offset, &baro_ets_altitude);
 #endif

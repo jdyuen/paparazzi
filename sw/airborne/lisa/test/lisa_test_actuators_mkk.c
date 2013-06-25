@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -24,8 +22,8 @@
 
 #include "mcu.h"
 #include "mcu_periph/sys_time.h"
-#include "firmwares/rotorcraft/commands.h"
-#include "actuators.h"
+#include "subsystems/commands.h"
+#include "subsystems/actuators.h"
 #include "subsystems/datalink/downlink.h"
 #include "led.h"
 
@@ -95,7 +93,7 @@ static inline void main_periodic_task( void ) {
     commands[COMMAND_YAW] = 20;
     commands[COMMAND_THRUST] = 0;
     // actuators_set(TRUE);
-    actuators_set(FALSE);
+    //actuators_set(FALSE);
   }
   LED_PERIODIC();
 

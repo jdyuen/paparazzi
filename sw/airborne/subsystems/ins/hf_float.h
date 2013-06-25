@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -21,20 +19,38 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file subsystems/ins/hf_float.h
+ *
+ * Horizontal filter (x,y) to estimate position and velocity.
+ *
+ */
+
 #ifndef HF_FLOAT_H
 #define HF_FLOAT_H
 
 #include "std.h"
 #include "math/pprz_algebra_float.h"
+#include "generated/airframe.h"
 
 #define HFF_STATE_SIZE 2
 
+#ifndef AHRS_PROPAGATE_FREQUENCY
+#define AHRS_PROPAGATE_FREQUENCY PERIODIC_FREQUENCY
+#endif
+
 #ifndef HFF_PRESCALER
+#if AHRS_PROPAGATE_FREQUENCY == 512
 #define HFF_PRESCALER 16
+#elif AHRS_PROPAGATE_FREQUENCY == 500
+#define HFF_PRESCALER 10
+#else
+#error "HFF_PRESCALER needs to be a divisor of AHRS_PROPAGATE_FREQUENCY"
+#endif
 #endif
 
 /* horizontal filter propagation frequency */
-#define HFF_FREQ (512./HFF_PRESCALER)
+#define HFF_FREQ (AHRS_PROPAGATE_FREQUENCY/HFF_PRESCALER)
 #define DT_HFILTER (1./HFF_FREQ)
 
 #define HFF_UPDATE_SPEED

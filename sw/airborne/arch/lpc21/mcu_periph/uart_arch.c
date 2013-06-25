@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2010 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -22,9 +20,13 @@
  *
  */
 
-/*
- * Brief LPC21 uart code
+/**
+ * @file arch/lpc21/mcu_periph/uart_arch.c
+ * @ingroup lpc21_arch
+ *
+ * Handling of UART hardware for lpc21xx.
  */
+
 
 #include "mcu_periph/uart.h"
 #include "armVIC.h"
@@ -43,10 +45,14 @@ static inline void uart_enable_interrupts(struct uart_periph* p) {
 }
 
 static inline void uart_set_baudrate(struct uart_periph* p, uint32_t baud) {
-  // set the baudrate
-  ((uartRegs_t *)(p->reg_addr))->lcr = ULCR_DLAB_ENABLE;     // select divisor latches
-  ((uartRegs_t *)(p->reg_addr))->dll = (uint8_t)baud;        // set for baud low byte
-  ((uartRegs_t *)(p->reg_addr))->dlm = (uint8_t)(baud >> 8); // set for baud high byte
+  /* calculate the baudrate */
+  uint32_t _baud_reg_val = (uint16_t)((PCLK / (((float)baud) * 16.0)) + 0.5);
+  /* select divisor latches */
+  ((uartRegs_t *)(p->reg_addr))->lcr = ULCR_DLAB_ENABLE;
+  /* set for baud low byte */
+  ((uartRegs_t *)(p->reg_addr))->dll = (uint8_t)_baud_reg_val;
+  /* set for baud high byte */
+  ((uartRegs_t *)(p->reg_addr))->dlm = (uint8_t)(_baud_reg_val >> 8);
 
   // set the number of characters and other
   // user specified operating parameters
@@ -68,8 +74,9 @@ void uart_transmit(struct uart_periph* p, uint8_t data ) {
 
   temp = (p->tx_insert_idx + 1) % UART_TX_BUFFER_SIZE;
 
-  if (temp == p->tx_extract_idx)
+  if (temp == p->tx_extract_idx) {
     return;                          // no room
+  }
 
   cpsr = disableIRQ();                                // disable global interrupts
   ((uartRegs_t *)(p->reg_addr))->ier &= ~UIER_ETBEI;  // disable TX interrupts
@@ -94,7 +101,6 @@ void uart_transmit(struct uart_periph* p, uint8_t data ) {
 static inline void uart_ISR(struct uart_periph* p)
 {
   uint8_t iid;
-
   // loop until not more interrupt sources
   while (((iid = ((uartRegs_t *)(p->reg_addr))->iir) & UIIR_NO_INT) == 0)
   {
@@ -157,6 +163,19 @@ static inline void uart_ISR(struct uart_periph* p)
 #define UART0_VIC_SLOT 5
 #endif
 
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART0_TX
+  #ifdef USE_UART0_RX_ONLY
+    #warning "USE_UART0_RX_ONLY is deprecated, please set USE_UART0_TX=FALSE instead"
+    #define USE_UART0_TX FALSE
+  #else
+    #define USE_UART0_TX TRUE
+  #endif
+#endif
+#ifndef USE_UART0_RX
+#define USE_UART0_RX TRUE
+#endif
+
 void uart0_ISR(void) __attribute__((naked));
 
 void uart0_ISR(void) {
@@ -174,16 +193,18 @@ void uart0_init( void ) {
   uart_periph_init(&uart0);
   uart0.reg_addr = UART0_BASE;
 
-#ifdef USE_UART0_RX_ONLY
-  // only use the RX0 P0.1 pin, no TX
-  PINSEL0 = (PINSEL0 & ~U0_PINMASK_RX) | U0_PINSEL_RX;
-#else
+#if USE_UART0_RX && USE_UART0_TX
   // set port pins for UART0
   PINSEL0 = (PINSEL0 & ~U0_PINMASK) | U0_PINSEL;
+#elif USE_UART0_RX
+  // only use the RX0 P0.1 pin, no TX
+  PINSEL0 = (PINSEL0 & ~U0_PINMASK_RX) | U0_PINSEL_RX;
+#elif USE_UART0_TX
+  // only use tx
+  PINSEL0 = (PINSEL0 & ~U0_PINMASK_TX) | U0_PINSEL_TX;
 #endif
 
   // initialize uart parameters
-  uart_disable_interrupts(&uart0);
   uart_set_baudrate(&uart0, UART0_BAUD);
 
   // initialize the interrupt vector
@@ -203,6 +224,19 @@ void uart0_init( void ) {
 #define UART1_VIC_SLOT 6
 #endif
 
+/* by default enable UART Tx and Rx */
+#ifndef USE_UART1_TX
+  #ifdef USE_UART1_RX_ONLY
+    #warning "USE_UART1_RX_ONLY is deprecated, please set USE_UART1_TX=FALSE instead"
+    #define USE_UART1_TX FALSE
+  #else
+    #define USE_UART1_TX TRUE
+  #endif
+#endif
+#ifndef USE_UART1_RX
+#define USE_UART1_RX TRUE
+#endif
+
 void uart1_ISR(void) __attribute__((naked));
 
 void uart1_ISR(void) {
@@ -220,15 +254,17 @@ void uart1_init( void ) {
   uart_periph_init(&uart1);
   uart1.reg_addr = UART1_BASE;
 
-#ifdef USE_UART1_RX_ONLY
-  // only use the RX1 P0.9 pin, no TX
-  PINSEL0 = (PINSEL0 & ~U1_PINMASK_RX) | U1_PINSEL_RX;
-#else
+#if USE_UART1_RX && USE_UART0_TX
   // set port pins for UART1
   PINSEL0 = (PINSEL0 & ~U1_PINMASK) | U1_PINSEL;
+#elif USE_UART1_RX
+  // only use the RX0 P0.1 pin, no TX
+  PINSEL0 = (PINSEL0 & ~U1_PINMASK_RX) | U1_PINSEL_RX;
+#elif USE_UART1_TX
+  // only use tx
+  PINSEL0 = (PINSEL0 & ~U1_PINMASK_TX) | U1_PINSEL_TX;
 #endif
 
-  uart_disable_interrupts(&uart1);
   uart_set_baudrate(&uart1, UART1_BAUD);
 
   // initialize the interrupt vector

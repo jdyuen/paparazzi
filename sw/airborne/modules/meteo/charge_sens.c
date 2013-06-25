@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2011 Martin Mueller <martinmm@pfump.org>
  *
  * This file is part of paparazzi.
@@ -53,7 +51,7 @@ void charge_sens_init( void ) {
 }
 
 void charge_sens_periodic( void ) {
-  I2CReceive(CHARGE_SENS_DEV, charge_trans, CHARGE_SENS_I2C_ADDR, 2);
+  i2c_receive(&CHARGE_SENS_DEV, &charge_trans, CHARGE_SENS_I2C_ADDR, 2);
 }
 
 void charge_sens_event( void ) {

@@ -1,7 +1,35 @@
+/*
+ * Copyright (C) 2011  The Paparazzi Team
+ *
+ * This file is part of paparazzi.
+ *
+ * paparazzi is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * paparazzi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
+/**
+ * @file subsystems/navigation/poly_survey_adv.c
+ *
+ * Advanced polygon survey for fixedwings from Uni Stuttgart.
+ *
+ */
+
 #include "poly_survey_adv.h"
 
 #include "subsystems/nav.h"
-#include "estimator.h"
+#include "state.h"
 #include "autopilot.h"
 #include "generated/flight_plan.h"
 
@@ -10,9 +38,9 @@
 #endif
 
 
-/**
-The following variables are set by poly_survey_init and not changed later on
-**/
+/*
+  The following variables are set by poly_survey_init and not changed later on
+*/
 
 // precomputed vectors to ease calculations
 point2d dir_vec;
@@ -28,24 +56,25 @@ float psa_min_rad;
 float psa_sweep_width;
 float psa_shot_dist;
 float psa_altitude;
+float psa_offset_rad_multiplier;
 
 //direction for the flyover (0° == N)
 int segment_angle;
 int return_angle;
 
-/**
-The Following variables are dynamic, changed while navigating.
-**/
+/*
+   The Following variables are dynamic, changed while navigating.
+*/
 
 /*
-psa_stage starts at ENTRY and than circles trought the other
-states until to polygon is completely covered
-ENTRY : getting in the right position and height for the first flyover
-SEG   : fly from seg_start to seg_end and take pictures,
-        then calculate navigation points of next flyover
-TURN1 : do a 180° turn around seg_center1
-RET   : fly from ret_start to ret_end
-TURN2 : do a 180° turn around seg_center2
+  psa_stage starts at ENTRY and than circles trought the other
+  states until to polygon is completely covered
+  ENTRY : getting in the right position and height for the first flyover
+  SEG   : fly from seg_start to seg_end and take pictures,
+  then calculate navigation points of next flyover
+  TURN1 : do a 180° turn around seg_center1
+  RET   : fly from ret_start to ret_end
+  TURN2 : do a 180° turn around seg_center2
 */
 survey_stage psa_stage;
 
@@ -57,6 +86,10 @@ point2d seg_center2;
 point2d entry_center;
 point2d ret_start;
 point2d ret_end;
+point2d dummy2d;
+
+bool_t done_segs;
+bool_t started_rets;
 
 
 //helper functions and macro
@@ -76,13 +109,13 @@ static void nav_points(point2d start, point2d end)
 }
 
 /**
-   intercept two lines and give back the point of intersection
-   returns        : FALSE if no intersection can be found or intersection does not lie between points a and b
-   else TRUE
-   p              : returns intersection
-   x, y           : first line is defined by point x and y (goes through this points)
-   a1, a2, b1, b2 : second line by coordinates a1/a2, b1/b2
-**/
+ * intercept two lines and give back the point of intersection
+ * @return         FALSE if no intersection can be found or intersection does not lie between points a and b
+ * else TRUE
+ * @param p               returns intersection
+ * @param x, y            first line is defined by point x and y (goes through this points)
+ * @param a1, a2, b1, b2  second line by coordinates a1/a2, b1/b2
+ */
 static bool_t intercept_two_lines(point2d *p, point2d x, point2d y, float a1, float a2, float b1, float b2)
 {
   float divider, fac;
@@ -100,11 +133,11 @@ static bool_t intercept_two_lines(point2d *p, point2d x, point2d y, float a1, fl
 }
 
 /**
-   intersects a line with the polygon and gives back the two intersection points
-   returns : TRUE if two intersection can be found, else FALSE
-   x, y    : intersection points
-   a, b    : define the line to intersection
-**/
+ *  intersects a line with the polygon and gives back the two intersection points
+ *  @return        TRUE if two intersection can be found, else FALSE
+ *  @param x, y     intersection points
+ *  @param a, b     define the line to intersection
+ */
 static bool_t get_two_intersects(point2d *x, point2d *y, point2d a, point2d b)
 {
   int i, count = 0;
@@ -151,15 +184,15 @@ static bool_t get_two_intersects(point2d *x, point2d *y, point2d a, point2d b)
 }
 
 /**
-   initializes the variables needed for the survey to start
-   first_wp    :  the first Waypoint of the polygon
-   size        :  the number of points that make up the polygon
-   angle       :  angle in which to do the flyovers
-   sweep_width :  distance between the sweeps
-   shot_dist   :  distance between the shots
-   min_rad     :  minimal radius when navigating
-   altitude    :  the altitude that must be reached before the flyover starts
-**/
+ *  initializes the variables needed for the survey to start
+ *  @param first_wp      the first Waypoint of the polygon
+ *  @param size          the number of points that make up the polygon
+ *  @param angle         angle in which to do the flyovers
+ *  @param sweep_width   distance between the sweeps
+ *  @param shot_dist     distance between the shots
+ *  @param min_rad       minimal radius when navigating
+ *  @param altitude      the altitude that must be reached before the flyover starts
+ **/
 bool_t init_poly_survey_adv(uint8_t first_wp, uint8_t size, float angle, float sweep_width, float shot_dist, float min_rad, float altitude)
 {
   int i;
@@ -256,8 +289,17 @@ bool_t init_poly_survey_adv(uint8_t first_wp, uint8_t size, float angle, float s
   entry_center.y = seg_start.y - rad_vec.y;
 
   //fast climbing to desired altitude
-  NavVerticalAutoThrottleMode(100.0);
+  NavVerticalAutoThrottleMode(0.0);
   NavVerticalAltitudeMode(psa_altitude, 0.0);
+
+  //calculate the circle radius multiplier for the first turn off of the segment
+  //  -diameter of circle needs to be X + 0.5 sweep widths to make the return come
+  //  back down between two segments, radius should not be less than psa_min_rad
+  //  - multiplier is used like this to get the correct radius: (0.25 + psa_offset_rad_multiplier/2)*sweep_vec.[x|y]
+  //  - cast to int and add one like ceil(), .01 subtracted to deal with perfect radius match, cast back to float for divisions
+  psa_offset_rad_multiplier = (float)((int)(Max((2.0*psa_min_rad/psa_sweep_width - 0.51),0)) + 1);
+  done_segs = FALSE;
+  started_rets = FALSE;
 
   psa_stage = ENTRY;
 
@@ -265,12 +307,20 @@ bool_t init_poly_survey_adv(uint8_t first_wp, uint8_t size, float angle, float s
 }
 
 /**
-   main navigation routine. This is called periodically evaluates the current
-   Position and stage and navigates accordingly.
-   Returns True until the survey is finished
-**/
+ * main navigation routine. This is called periodically evaluates the current
+ * Position and stage and navigates accordingly.
+ * Returns True until the survey is finished
+ */
 bool_t poly_survey_adv(void)
 {
+#ifdef DC_SHOOT_ON_RETURN
+#pragma message "Using SHOOT ON RETURN for advanced poly survey"
+//FIXME Need to deal with return path line endpoints (hit actual poly boundary for sampling)
+{
+
+  NavVerticalAutoThrottleMode(0.0);
+  NavVerticalAltitudeMode(psa_altitude, 0.0);
+
   //entry circle around entry-center until the desired altitude is reached
   if (psa_stage == ENTRY) {
     nav_circle_XY(entry_center.x, entry_center.y, -psa_min_rad);
@@ -278,7 +328,125 @@ bool_t poly_survey_adv(void)
         && nav_approaching_xy(seg_start.x, seg_start.y, last_x, last_y, CARROT)
         && fabs(estimator_z - psa_altitude) <= 20) {
       psa_stage = SEG;
-      NavVerticalAutoThrottleMode(0.0);
+      nav_init_stage();
+#ifdef DIGITAL_CAM
+      //dc_survey(psa_shot_dist, seg_start.x - dir_vec.x*psa_shot_dist*0.5, seg_start.y - dir_vec.y*psa_shot_dist*0.5);
+      LINE_START_FUNCTION;
+#endif
+    }
+  }
+  //fly the segment until seg_end is reached
+  if (psa_stage == SEG) {
+    nav_points(seg_start, seg_end);
+    //calculate all needed points for the next flyover
+    if (nav_approaching_xy(seg_end.x, seg_end.y, seg_start.x, seg_start.y, 0)) {
+#ifdef DIGITAL_CAM
+      //dc_stop();
+      LINE_STOP_FUNCTION;
+#endif
+      // Calculate the center of the first turn circle
+      seg_center1.x = seg_end.x - (0.25 + psa_offset_rad_multiplier/2)*sweep_vec.x;
+      seg_center1.y = seg_end.y - (0.25 + psa_offset_rad_multiplier/2)*sweep_vec.y;
+      // Calculate the start point of the return line
+      ret_start.x = seg_end.x - 2.0*(0.25 + psa_offset_rad_multiplier/2)*sweep_vec.x;
+      ret_start.y = seg_end.y - 2.0*(0.25 + psa_offset_rad_multiplier/2)*sweep_vec.y;
+
+      //increment the survey segment and if we get no intersection the survey is finished
+      if (!get_two_intersects(&seg_start, &seg_end, vec_add(seg_start, sweep_vec), vec_add(seg_end, sweep_vec)))
+      {
+      //  return FALSE;
+        //increment the survey segment
+        seg_start = vec_add(seg_start, sweep_vec);
+        seg_end = vec_add(seg_end, sweep_vec);
+        done_segs = TRUE;
+      }
+
+      // Calculate the end point of the return line
+      ret_end.x = seg_start.x - sweep_vec.x - 2.0*(0.25 + psa_offset_rad_multiplier/2)*sweep_vec.x;
+      ret_end.y = seg_start.y - sweep_vec.y - 2.0*(0.25 + psa_offset_rad_multiplier/2)*sweep_vec.y;
+
+      // if we are in the survey area, make sure the return path starts and ends at the polygon edge
+      // also flag if we have started return survey passes
+      // FIXME
+      // weird, but we have to reverse the order of the points here (because going backwards?)
+      if (get_two_intersects(&dummy2d, &dummy2d, ret_start, ret_end))
+      {
+        started_rets = TRUE;
+      }
+
+      // Calculate the center of the bigger second circle
+      seg_center2.x = seg_start.x - 0.5*(2.0*(0.25 + psa_offset_rad_multiplier/2)*sweep_vec.x + sweep_vec.x);
+      seg_center2.y = seg_start.y - 0.5*(2.0*(0.25 + psa_offset_rad_multiplier/2)*sweep_vec.y + sweep_vec.y);
+      
+      psa_stage = TURN1;
+      nav_init_stage();
+    }
+  }
+  //turn from stage to return
+  else if (psa_stage == TURN1) {
+    //nav_circle_XY(seg_center1.x, seg_center1.y, -psa_min_rad);
+    nav_circle_XY(seg_center1.x, seg_center1.y, -(0.25 + psa_offset_rad_multiplier/2)*psa_sweep_width);
+    if (NavCourseCloseTo(return_angle)) {
+      psa_stage = RET;
+      nav_init_stage();
+#ifdef DIGITAL_CAM
+      //if we are actually in the survey region, start the function on the return trip (usually the cam)
+      if (get_two_intersects(&dummy2d, &dummy2d, ret_start, ret_end))
+      {
+        LINE_START_FUNCTION;
+      }
+#endif
+    }
+    //return
+  } else if (psa_stage == RET) {
+    nav_points(ret_start, ret_end);
+    if (nav_approaching_xy(ret_end.x, ret_end.y, ret_start.x, ret_start.y, 0)) {
+#ifdef DIGITAL_CAM
+      LINE_STOP_FUNCTION;
+#endif
+      //if we get no intersection on the next return pass the survey is finished, doing this here instead of in main calc section
+      if ((started_rets) && (done_segs) && (!get_two_intersects(&dummy2d, &dummy2d, vec_add(ret_start, sweep_vec), vec_add(ret_end, sweep_vec))))
+        return FALSE;
+
+      psa_stage = TURN2;
+      nav_init_stage();
+    }
+    //turn from return to stage
+  } else if (psa_stage == TURN2) {
+    //nav_circle_XY(seg_center2.x, seg_center2.y, -(2*psa_min_rad+psa_sweep_width)*0.5);
+    nav_circle_XY(seg_center2.x, seg_center2.y, -0.5*(2.0*(0.25 + psa_offset_rad_multiplier/2) + 1.0)*psa_sweep_width);
+    if (NavCourseCloseTo(segment_angle)) {
+      psa_stage = SEG;
+      nav_init_stage();
+#ifdef DIGITAL_CAM
+      //dc_survey(psa_shot_dist, seg_start.x - dir_vec.x*psa_shot_dist*0.5, seg_start.y - dir_vec.y*psa_shot_dist*0.5);
+      //only start function if in survey region
+      if (get_two_intersects(&dummy2d, &dummy2d, seg_start, seg_end))
+        LINE_START_FUNCTION;
+#endif
+    }
+  }
+
+  return TRUE;
+}
+
+
+
+#else // not using DC_SHOOT_ON_RETURN
+
+
+
+{
+  NavVerticalAutoThrottleMode(0.0);
+  NavVerticalAltitudeMode(psa_altitude, 0.0);
+
+  //entry circle around entry-center until the desired altitude is reached
+  if (psa_stage == ENTRY) {
+    nav_circle_XY(entry_center.x, entry_center.y, -psa_min_rad);
+    if (NavCourseCloseTo(segment_angle)
+        && nav_approaching_xy(seg_start.x, seg_start.y, last_x, last_y, CARROT)
+        && fabs(stateGetPositionEnu_f()->z - psa_altitude) <= 20) {
+      psa_stage = SEG;
       nav_init_stage();
 #ifdef DIGITAL_CAM
       dc_survey(psa_shot_dist, seg_start.x - dir_vec.x*psa_shot_dist*0.5, seg_start.y - dir_vec.y*psa_shot_dist*0.5);
@@ -338,4 +506,6 @@ bool_t poly_survey_adv(void)
   }
 
   return TRUE;
+}
+#endif // DC_SHOOT_ON_RETURN
 }

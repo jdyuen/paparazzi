@@ -1,0 +1,31 @@
+<!DOCTYPE procedure SYSTEM "flight_plan.dtd">
+
+<procedure>
+
+  <waypoints>
+    <!-- starting at northeast corner, clockwise -->
+    <waypoint name="_1ell" lat="53.42327" lon="-113.54694"/>
+    <waypoint name="_2ell" lat="53.41953" lon="-113.54701"/>
+    <waypoint name="_3ell" lat="53.41887" lon="-113.54494"/>
+    <waypoint name="_4ell" lat="53.41403" lon="-113.54677"/>
+    <waypoint name="_5ell" lat="53.41102" lon="-113.54605"/>
+    <waypoint name="_6ell" lat="53.41102" lon="-113.56202"/>
+    <waypoint name="_7ell" lat="53.41603" lon="-113.56195"/>
+    <waypoint name="_8ell" lat="53.41804" lon="-113.55978"/>
+    <waypoint name="_9ell" lat="53.42326" lon="-113.55969"/>
+    <waypoint name="_CntrEll" lat="53.41766" lon="-113.55010"/>
+  </waypoints>
+
+<!-- need to make a few overlapping sectors so all are convex -->
+  <sectors>
+    <!-- north sector -->
+    <sector name="SoftKillNor">
+      <corner name="_1ell"/>
+      <corner name="_2ell"/>
+      <corner name="_CntrEll"/>
+      <corner name="_8ell"/>
+      <corner name="_9ell"/>
+    </sector>
+  </sectors>
+
+</procedure>

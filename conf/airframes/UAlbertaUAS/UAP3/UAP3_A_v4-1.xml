@@ -1,0 +1,361 @@
+<!DOCTYPE airframe SYSTEM "../../airframe.dtd">
+
+<!--
+      UAP3-A : U of A UAS Group Unmanned Aircraft Platform 3 Configuration A
+      MULTIPLEX Mentor
+      Slight modifications for avionics and payload mounting
+      Default Power Pack: Himax 3528-1000 Brushless Motor, 11 x 5.5 APC Prop, Hub and Driver
+        Castle Creations Thunderbird-54 ESC
+      2-4 2200mAh 3S LiPo packs in parallel, Castle Creations CCBEC @ 5V for avionics
+      Spektrum DX-8 Transmitter, 2x DSM2 Satellite Receivers
+      Transition Robotics Lisa/M v2.0 with Aspirin 2.1
+      PPZUAV GPS13 gps
+      Digi XBee-PRO S2 radio modems (transparent serial), wire in air, U.Fl + RP-SMA on ground
+      Eagle Tree Systems Airspeed Microsensor V3
+
+      Payload :
+      Sparkfun Logomatic 2.6 with modified logger firmware for telemetry logging and interfacing
+        to spectrometer
+      Ocean Optics USB2000+ Spectrometer with cap lens
+      GoPro HD Hero2
+      Custom aluminum sheet metal mount integrated to landing gear block, easy modular payload mounting capability
+
+      Additional Notes:
+       - This airframe is based off of conf/airframes/examples/MentorEnergy.xml
+-->
+
+<airframe name="UAP3_A">
+
+  <firmware name="fixedwing">
+    <target name="ap" board="lisa_m_2.0">
+      <define name="LISA_M_XPORT_YUP_ZFRONT"/> <!-- added to change orientation for UAP-3 -->
+
+      <configure name="PERIODIC_FREQUENCY" value="120"/>
+      <configure name="AHRS_PROPAGATE_FREQUENCY" value="100"/>
+      <configure name="AHRS_CORRECT_FREQUENCY" value="100"/>
+      <define name="AHRS_TRIGGERED_ATTITUDE_LOOP"/>
+      <define name="AIRSPEED_ETS_I2C_DEV" value="i2c2"/>
+      <define name="USE_I2C2"/>
+
+      <define name="USE_AHRS_GPS_ACCELERATIONS"/><!-- in the dcm ahrs algorithm for updating longitudinal accel/gps stuff??-->
+
+      <subsystem name="radio_control" type="spektrum">
+        <define name="RADIO_MODE" value="RADIO_GEAR"/> <!-- define which channel/switch is the mode switch -->
+        <configure name="USE_SECONDARY_SPEKTRUM_RECEIVER" value="1"/>
+      </subsystem>
+    </target>
+
+    <target name="sim" board="pc">
+      <subsystem name="radio_control" type="ppm"/> <!-- for sim target because it doesn't support spektrum -->
+    </target>
+
+    <define name="USE_LED_12"/> <!-- try explicitly enabling the use of LED_12 on PC12 gpio on lisa/m v2 for spectrometer -->
+
+    <define name="USE_AIRSPEED"/> <!-- enable use of an airspeed sensor -->
+    <define name="USE_I2C2"/> <!-- port for airspeed sensor -->
+    <define name="AGR_CLIMB"/>
+    <define name="STRONG_WIND"/>
+    <define name="WIND_INFO"/>
+    <define name="WIND_INFO_RET"/>
+    <define name="SENSOR_SYNC_SEND"/> <!-- directly send airspeed message, no telemetry entry needed -->
+    <define name="ALT_KALMAN"/>
+    <!-- <define name="LOITER_TRIM"/>
+    <define name="TUNE_AGRESSIVE_CLIMB"/> -->
+    <!-- Sensors -->
+    <!--
+    <subsystem name="ahrs" type="int_cmpl_quat">
+      <define name="AHRS_GRAVITY_UPDATE_COORDINATED_TURN" />
+    </subsystem>
+    -->
+    <subsystem name="imu" type="aspirin_v2.1"/>
+    <subsystem name="ahrs" type="float_dcm">
+<!--      <define name="USE_MAGNETOMETER" /> -->
+    </subsystem>
+
+
+<!-- Moved to be specific for different targets, sim target doesn't yet support spektrum -->
+    <!-- <subsystem name="radio_control" type="spektrum">
+      <define name="RADIO_MODE" value="RADIO_GEAR"/>
+      <configure name="USE_SECONDARY_SPEKTRUM_RECEIVER" value="1"/>
+    </subsystem> -->
+
+    <!-- Communication -->
+    <subsystem name="telemetry" type="transparent">
+      <configure name="MODEM_BAUD" value="B57600"/>
+      <configure name="MODEM_PORT" value="UART2"/>
+    </subsystem>
+
+    <!-- Actuators -->
+    <subsystem name="control" type="energy"/>
+    <!-- Sensors -->
+    <subsystem name="navigation" type="extra"/>
+    <subsystem name="gps" type="ublox">
+      <configure name="GPS_PORT" value="UART3"/>
+    </subsystem>
+  </firmware>
+
+  <modules>
+    <load name="gps_ubx_ucenter.xml"/> <!-- not sure if this is needed??? -->
+    <load name="airspeed_ets.xml">
+      <define name="AIRSPEED_ETS_I2C_DEV" value="i2c2"/>
+    </load>
+<!--
+    <load name="adc_generic.xml">
+      <configure name="ADC_CHANNEL_GENERIC1" value="0"/>
+      <configure name="ADC_CHANNEL_GENERIC2" value="1"/>
+    </load>
+-->
+<!--
+    <load name="light.xml">
+      <define name="LIGHT_LED_STROBE" value="2"/>
+      <define name="LIGHT_LED_NAV" value="3"/>
+      <define name="STROBE_LIGHT_MODE_DEFAULT" value="6"/>
+      <define name="NAV_LIGHT_MODE_DEFAULT" value="4"/>
+    </load>
+-->
+
+    <load name="digital_cam.xml">
+      <define name="DC_SHUTTER_LED" value="12"/> <!-- LED 12 is on PC12 on GPIO connector, need to explicitly enable in firmware section -->
+      <define name="DC_SHUTTER_DELAY" value="1"/> <!-- at 4Hz gives 0.25s shutter trigger pulse -->
+      <define name="DC_PUSH" value="LED_OFF" /> <!-- actually LED_OFF is High on Lisa/M v2 -->
+      <define name="DC_RELEASE" value="LED_ON" />
+    </load>
+
+    <load name="photogrammetry_calculator.xml"/>
+
+<!--
+    <load name="nav_catapult.xml"/>
+-->
+  </modules>
+
+  <servos>
+    <servo name="THROTTLE" no="0" min="1000" neutral="1000" max="2000"/>
+    <servo name="AILEVON_LEFT" no="1" min="1252" neutral="1552" max="1852"/> <!-- trimmed centered at 1552 -->
+    <servo name="ELEVATOR" no="2" min="1950" neutral="1450" max="950"/> <!-- trimmed centered at 1410 -->
+    <servo name="RUDDER" no="3" min="1100" neutral="1500" max="1900"/>
+    <servo name="AILEVON_RIGHT" no="4" min="1852" neutral="1552" max="1252"/>
+  </servos>
+
+  <commands>
+    <axis name="THROTTLE" failsafe_value="0"/>
+    <axis name="ROLL" failsafe_value="0"/>
+    <axis name="PITCH" failsafe_value="0"/>
+    <axis name="YAW" failsafe_value="0"/>
+  </commands>
+
+  <rc_commands>
+    <set command="THROTTLE" value="@THROTTLE"/>
+    <set command="ROLL" value="@ROLL"/>
+    <set command="PITCH" value="@PITCH"/>
+    <set command="YAW" value="@YAW"/>
+  </rc_commands>
+
+  <!-- ADD SOME RUDDER MIXING!!!! -->
+  <section name="MIXER">
+    <define name="MIX_YAW_OF_ROLL" value="0.3f"/>
+  </section>
+
+  <command_laws>
+    <let var="enable_mix" value="((fbw_mode > FBW_MODE_MANUAL) ? 1 : 0)"/>
+    <!-- <let var="enable_mix" value="1"/> -->
+    <let var="yaw_mixed" value="(int16_t)((@ROLL) * MIX_YAW_OF_ROLL * (float)($enable_mix))"/>
+    <set servo="AILEVON_LEFT" value="@ROLL"/>
+    <set servo="AILEVON_RIGHT" value="-@ROLL"/>
+    <set servo="THROTTLE" value="@THROTTLE"/>
+    <set servo="ELEVATOR" value="@PITCH"/>
+    <!-- <set servo="RUDDER" value="@YAW + @ROLL"/> -->
+    <set servo="RUDDER" value="@YAW + $yaw_mixed"/>
+  </command_laws>
+
+  <!-- <auto_rc_commands> -->
+    <!-- No rc yaw in auto modes -->
+  <!-- </auto_rc_commands> -->
+
+  <ap_only_commands>
+   <!-- no commands only available in AP -->
+ </ap_only_commands>
+
+  <!-- Local magnetic field -->
+  <!-- calculated for edmonton from noaa site for july 2012 -->
+<!--
+  <section name="AHRS" prefix="AHRS_" >
+    <define name="H_X" value="0.243017040765395"/>
+    <define name="H_Y" value="0.066320602352931"/>
+    <define name="H_Z" value="0.967752187081577"/>
+  </section>
+-->
+  <!-- calculated for edmonton from noaa site for oct 12, 2012 -->
+  <section name="AHRS" prefix="AHRS_" >
+    <define name="H_X" value="0.243264290374793"/>
+    <define name="H_Y" value="0.066107824641017"/>
+    <define name="H_Z" value="0.967704624640020"/>
+  </section>
+
+  <section name="IMU" prefix="IMU_">
+    <!-- Should calibrate accel and mag -->
+
+    <define name="BODY_TO_IMU_PHI" value="0"/>
+    <define name="BODY_TO_IMU_THETA" value="0"/>
+    <define name="BODY_TO_IMU_PSI" value="0"/>
+  </section>
+
+  <section name="INS" prefix="INS_">
+    <define name="ROLL_NEUTRAL_DEFAULT" value="0.0" unit="deg"/>
+    <define name="PITCH_NEUTRAL_DEFAULT" value="0.0" unit="deg"/>
+  </section>
+
+  <section name="TRIM" prefix="COMMAND_">
+    <!-- <define name="ROLL_TRIM" value="0"/>
+    <define name="PITCH_TRIM" value="788."/> Figure these values out after flight testing -->
+  </section>
+
+
+  <section name="AUTO1" prefix="AUTO1_">
+    <define name="MAX_ROLL" value="1.0"/>
+    <define name="MAX_PITCH" value="1.0"/>
+  </section>
+
+  <section name="BAT">
+    <!-- <define name="MilliAmpereOfAdc(adc)" value="((adc) - 505) * 124.0f"/> -->
+
+    <define name="MILLIAMP_AT_FULL_THROTTLE" value="27000" unit="mA"/> <!-- max current draw at full throttle -->
+    <define name="CURRENT_ESTIMATION_NONLINEARITY" value="1.2"/> <!-- superellipse non-linearity adjustment for current draw -->
+
+    <define name="LOW_BAT_LEVEL" value="10.3" unit="V"/>
+    <define name="CRITIC_BAT_LEVEL" value="9.9" unit="V"/>
+    <define name="CATASTROPHIC_BAT_LEVEL" value="9.1" unit="V"/>
+
+    <define name="MAX_BAT_LEVEL" value="12.6" unit="V"/>
+  </section>
+
+  <section name="MISC">
+    <define name="CLIMB_AIRSPEED" value="14." unit="m/s"/>
+    <define name="NOMINAL_AIRSPEED" value="16." unit="m/s"/>
+    <define name="GLIDE_AIRSPEED" value="12." unit="m/s"/>
+    <define name="RACE_AIRSPEED" value="25." unit="m/s"/>
+
+    <define name="CARROT" value="5." unit="s"/>
+
+    <define name="ALT_KALMAN_ENABLED" value="TRUE"/>
+
+    <define name="DEFAULT_CIRCLE_RADIUS" value="60."/>
+
+    <define name="NAV_GLIDE_PITCH_TRIM" value="0."/>
+  </section>
+
+<!--
+  <section name="CATAPULT" prefix="NAV_CATAPULT_">
+    <define name="MOTOR_DELAY" value="45"/>
+    <define name="HEADING_DELAY" value="(60*3)"/>
+    <define name="ACCELERATION_THRESHOLD" value="1.75"/>
+    <define name="INITIAL_PITCH" value="(15.0/57.0)"/>
+    <define name="INITIAL_THROTTLE" value="1.0"/>
+  </section>
+-->
+
+<!-- For navigation/gls.c -->
+  <section name="GLS_APPROACH" prefix="APP_">
+    <define name="ANGLE" value="5." unit="deg"/>
+    <define name="INTERCEPT_AF_TOD" value="20."/> <!-- metres -->
+    <define name="TARGET_SPEED" value="13."/>
+  </section>
+
+  <section name="VERTICAL CONTROL" prefix="V_CTL_">
+    <define name="POWER_CTL_BAT_NOMINAL" value="11.1" unit="volt"/>
+    <!-- outer loop proportional gain -->
+    <define name="ALTITUDE_PGAIN" value="0.104999996722"/>
+    <!-- outer loop saturation -->
+    <define name="ALTITUDE_MAX_CLIMB" value="3."/>
+
+    <!-- auto throttle inner loop -->
+    <define name="AUTO_THROTTLE_NOMINAL_CRUISE_THROTTLE" value="0.73"/>
+    <define name="AUTO_THROTTLE_MIN_CRUISE_THROTTLE" value="0.35"/>
+    <define name="AUTO_THROTTLE_MAX_CRUISE_THROTTLE" value="0.7"/>
+
+    <define name="AUTO_THROTTLE_CLIMB_THROTTLE_INCREMENT" value="0.518000006676" unit="%/(m/s)"/>
+    <define name="AUTO_THROTTLE_PITCH_OF_VZ_PGAIN" value="0.307000011206"/>
+
+    <!--
+    <define name="AIRSPEED_PGAIN" value="0.0"/>
+
+    <define name="AUTO_THROTTLE_OF_AIRSPEED_PGAIN" value="0.0"/>
+    <define name="AUTO_THROTTLE_OF_AIRSPEED_IGAIN" value="0.0"/>
+
+    <define name="ENERGY_TOT_PGAIN" value="0.0"/>
+    <define name="ENERGY_TOT_IGAIN" value="0.0"/>
+    <define name="ENERGY_DIFF_PGAIN" value="0.0"/>
+    <define name="ENERGY_DIFF_IGAIN" value="0.0"/>
+    -->
+
+    <define name="THROTTLE_SLEW_LIMITER" value="1" unit="s"/>
+  </section>
+
+  <section name="HORIZONTAL CONTROL" prefix="H_CTL_">
+    <define name="COURSE_PGAIN" value="0.89200001955"/>
+    <define name="COURSE_DGAIN" value="0.273000001907"/>
+    <define name="COURSE_PRE_BANK_CORRECTION" value="1.00800001621"/>
+
+    <define name="ROLL_MAX_SETPOINT" value="60." unit="deg"/>
+    <define name="PITCH_MAX_SETPOINT" value="25." unit="deg"/>
+    <define name="PITCH_MIN_SETPOINT" value="-20." unit="deg"/>
+
+    <define name="PITCH_PGAIN" value="13000."/>
+    <define name="PITCH_DGAIN" value="1.5"/>
+
+    <define name="ELEVATOR_OF_ROLL" value="1600.0"/>
+
+    <define name="ROLL_SLEW" value="1."/>
+
+    <define name="ROLL_ATTITUDE_GAIN" value="10000.0"/>
+    <define name="ROLL_RATE_GAIN" value="500."/>
+  </section>
+
+
+  <section name="FAILSAFE" prefix="FAILSAFE_">
+    <define name="DEFAULT_THROTTLE" value="0.35" unit="%"/>
+    <define name="DEFAULT_ROLL" value="10.0" unit="deg"/>
+    <define name="DEFAULT_PITCH" value="5.0" unit="deg"/>
+
+    <define name="HOME_RADIUS" value="DEFAULT_CIRCLE_RADIUS" unit="m"/>
+    <define name="KILL_MODE_DISTANCE" value="(MAX_DIST_FROM_HOME*1.5)"/>
+    <define name="DELAY_WITHOUT_GPS" value="3" unit="s"/>
+  </section>
+
+  <section name="AGGRESSIVE" prefix="AGR_">
+    <define name="BLEND_START" value="50"/><!-- Altitude Error to Initiate Aggressive Climb CANNOT BE ZERO!!-->
+    <define name="BLEND_END" value="25"/><!-- Altitude Error to Blend Aggressive to Regular Climb Modes  CANNOT BE ZERO!!-->
+    <define name="CLIMB_THROTTLE" value="0.9"/><!-- Gaz for Aggressive Climb -->
+    <define name="CLIMB_PITCH" value="0.35"/><!-- Pitch for Aggressive Climb -->
+    <define name="DESCENT_THROTTLE" value="0.05"/><!-- Gaz for Aggressive Decent -->
+    <define name="DESCENT_PITCH" value="-0.35"/><!-- Pitch for Aggressive Decent -->
+    <define name="CLIMB_NAV_RATIO" value="0.8"/><!-- Percent Navigation for Altitude Error Equal to Start Altitude -->
+    <define name="DESCENT_NAV_RATIO" value="1.0"/>
+  </section>
+
+  <section name="SIMU">
+    <define name="YAW_RESPONSE_FACTOR" value="0.7"/> <!-- default: 1.0, a too low of a value gives bad simulation results -->
+    <define name="WEIGHT" value="1.1"/> <!-- default: 1.0, factor divided into the vertical accel (from lift forces) and the horizontal accel (airspeed_dot, from thrust forces) -->
+    <define name="ROLL_RESPONSE_FACTOR" value="15.0"/> <!-- default: 15.0 -->
+    <!-- <define name="PITCH_RESPONSE_FACTOR" value="1.0"/> --> <!-- default: 1.0 -->
+  </section>
+
+  <section name="DIGITAL_CAMERA" prefix="DC_">
+    <define name="AUTOSHOOT_QUARTERSEC_PERIOD" value="4" unit="quarter_second"/>
+    <define name="AUTOSHOOT_METER_GRID" value="25" unit="meter"/>
+    <define name="IMAGE_BUFFER" value="9999"/>
+  </section>
+
+  <section name="Photogrammetry" prefix="PHOTOGRAMMETRY_">
+    <!-- Camera Parameters -->
+    <define name="FOCAL_LENGTH" value="960" unit="mm"/>    <!-- here it is not in mm, it is relative to get correct ratios at 90deg FOV -->
+    <define name="SENSOR_WIDTH" value="1920" unit="mm"/>    <!-- In direction of the plane's wings -->
+    <define name="SENSOR_HEIGHT" value="1080" unit="mm"/> <!-- In direction of the plane's nose -->
+    <define name="PIXELS_WIDTH" value="1920" unit=""/>
+
+    <!-- Flight Safety Parameters -->
+    <define name="HEIGHT_MIN" value="35" unit="m"/>
+    <define name="HEIGHT_MAX" value="220" unit="m"/>
+    <define name="RADIUS_MIN" value="70" unit="m"/>
+  </section>
+
+</airframe>

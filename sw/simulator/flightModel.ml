@@ -1,6 +1,4 @@
 (*
- *  $Id$
- *
  * Basic flight model for simulation
  *
  * Copyright (C) 2004-2006 Pascal Brisset, Antoine Drouin
@@ -137,6 +135,9 @@ module Make(A:Data.MISSION) = struct
   let roll_response_factor =
     try float_value simu_section "ROLL_RESPONSE_FACTOR" with _ -> 15.
 
+  let pitch_response_factor =
+    try float_value simu_section "PITCH_RESPONSE_FACTOR" with _ -> 1.
+
   let yaw_response_factor =
     try float_value simu_section "YAW_RESPONSE_FACTOR" with _ -> 1.
 
@@ -214,8 +215,15 @@ module Make(A:Data.MISSION) = struct
 
 (* Minimum complexity *)
 (*
-   http://controls.ae.gatech.edu/papers/johnson_dasc_01.pdf
-   http://controls.ae.gatech.edu/papers/johnson_mst_01.pdf
+   Johnson, E.N., Fontaine, S.G., and Kahn, A.D.,
+   “Minimum Complexity Uninhabited Air Vehicle Guidance And Flight Control System,”
+   Proceedings of the 20th Digital Avionics Systems Conference, 2001.
+   http://www.ae.gatech.edu/~ejohnson/JohnsonFontaineKahn.pdf
+
+   Johnson, E.N. and Fontaine, S.G.,
+   “Use Of Flight Simulation To Complement Flight Testing Of Low-Cost UAVs,”
+   Proceedings of the AIAA Modeling and Simulation Technology Conference, 2001.
+   http://www.ae.gatech.edu/~ejohnson/AIAA%202001-4059.pdf
  *)
   let state_update = fun state nominal_airspeed (wx, wy, wz) agl dt ->
     let now = state.t +. dt in
@@ -238,7 +246,7 @@ module Make(A:Data.MISSION) = struct
       (* Aerodynamic pitching moment coeff, proportional to elevator;
         No Thrust moment, so null (0) for steady flight *)
       let c_m = 5e-7 *.state.delta_b in
-      let theta_dot_dot = c_m *. v2 -. state.theta_dot in
+      let theta_dot_dot = pitch_response_factor *. c_m *. v2 -. state.theta_dot in
       state.theta_dot <- state.theta_dot +. theta_dot_dot *. dt;
       state.theta <- state.theta +. state.theta_dot *. dt;
 

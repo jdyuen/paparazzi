@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -20,10 +18,18 @@
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  */
-#ifndef STABILISATION_ATTITUDE_REF_FLOAT_H
-#define STABILISATION_ATTITUDE_REF_FLOAT_H
+
+/** @file stabilization_attitude_ref_float.h
+ *  Rotorcraft attitude reference generation API.
+ *  Common to all floating-point reference generators (euler and quaternion)
+ */
+
+#ifndef STABILIZATION_ATTITUDE_REF_FLOAT_H
+#define STABILIZATION_ATTITUDE_REF_FLOAT_H
 
 #include "generated/airframe.h"
+
+#include "state.h"
 
 extern struct FloatEulers stab_att_sp_euler;
 extern struct FloatQuat   stab_att_sp_quat;
@@ -39,4 +45,7 @@ struct FloatRefModel {
 
 extern struct FloatRefModel stab_att_ref_model[];
 
-#endif /* STABILISATION_ATTITUDE_REF_FLOAT_H */
+extern void stabilization_attitude_ref_init(void);
+extern void stabilization_attitude_ref_update(void);
+
+#endif /* STABILIZATION_ATTITUDE_REF_FLOAT_H */

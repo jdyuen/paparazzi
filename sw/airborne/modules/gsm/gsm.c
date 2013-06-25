@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009 ENAC, Arnaud Quintard, Pascal Brisset
  *
  * This file is part of paparazzi.
@@ -41,7 +39,7 @@ Reporting:
   In: OK
   Out: AT+CMGS=\"GCS_NUMBER\"
   In: >
-  Out: gps.utm_pos.east, gps.utm_pos.north, gps.course, gps.hmsl, gps.gspeed, -gps.ned_vel.z, vsupply, estimator_flight_time, rssi  CTRLZ
+  Out: gps.utm_pos.east, gps.utm_pos.north, gps.course, gps.hmsl, gps.gspeed, -gps.ned_vel.z, vsupply, autopilot_flight_time, rssi  CTRLZ
 
 Receiving:
   In: +CMTI: ...,<number>
@@ -71,12 +69,11 @@ Receiving:
 #include "ap_subsystems/datalink/downlink.h"
 #include "subsystems/gps.h"
 #include "autopilot.h"
-#include "estimator.h"
 //#include "subsystems/navigation/common_nav.h"  //why is should this be needed?
 #include "generated/settings.h"
 
 #ifndef GSM_LINK
-#define GSM_LINK Uart3100
+#define GSM_LINK UART3100
 #endif
 
 #define GSM_MAX_PAYLOAD 160
@@ -409,9 +406,9 @@ void gsm_send_report_continue(void)
   uint8_t rssi = atoi(gsm_buf + strlen("+CSQ: "));
 
   // Donnee GPS :ne sont pas envoyes gps_mode, gps.tow, gps.utm_pos.zone, gps_nb_ovrn
-  // Donnees batterie (seuls vsupply et estimator_flight_time sont envoyes)
+  // Donnees batterie (seuls vsupply et autopilot_flight_time sont envoyes)
   // concatenation de toutes les infos en un seul message à transmettre
-  sprintf(data_to_send, "%ld %ld %d %ld %d %d %d %d %d", gps.utm_pos.east, gps.utm_pos.north, gps_course, gps.hmsl, gps.gspeed, -gps.ned_vel.z, vsupply, estimator_flight_time, rssi);
+  sprintf(data_to_send, "%ld %ld %d %ld %d %d %d %d %d", gps.utm_pos.east, gps.utm_pos.north, gps_course, gps.hmsl, gps.gspeed, -gps.ned_vel.z, vsupply, autopilot_flight_time, rssi);
 
   // send the number and wait for the prompt
   char buf[32];

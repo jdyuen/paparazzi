@@ -12,14 +12,13 @@
 #include "std.h"
 #include "inter_mcu.h"
 #include "autopilot.h"
-#include "estimator.h"
 #include "subsystems/gps.h"
 #include "subsystems/navigation/traffic_info.h"
 #include "generated/settings.h"
 #include "subsystems/nav.h"
 #include "firmwares/fixedwing/stabilization/stabilization_attitude.h"
 #include "firmwares/fixedwing/guidance/guidance_v.h"
-#include "commands.h"
+#include "subsystems/commands.h"
 #include "firmwares/fixedwing/main_ap.h"
 #include "ap_downlink.h"
 #include "sim_uart.h"
@@ -42,7 +41,6 @@ bool_t launch;
 uint8_t gps_nb_ovrn, link_fbw_fbw_nb_err, link_fbw_nb_err;
 float alt_roll_pgain;
 float roll_rate_pgain;
-bool_t gpio1_status;
 uint16_t datalink_time = 0;
 
 
@@ -55,6 +53,7 @@ value sim_periodic_task(value unit) {
   reporting_task();
   modules_periodic_task();
   periodic_task_fbw();
+  electrical_periodic();
   event_task_ap();
   event_task_fbw();
   return unit;

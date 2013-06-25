@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009  Martin Mueller
  *
  * This file is part of paparazzi.
@@ -91,6 +89,9 @@
 #ifdef USE_MAX11040
 #include "max11040.h"
 #endif
+
+#include "LPC21xx.h"
+
 
 #ifndef FALSE
 #define FALSE 0
@@ -366,7 +367,7 @@ void log_xbee(unsigned char c, unsigned char source)
 #ifndef USE_MAX11040
     log_payload(xbeel_payload_len-XBEE_RFDATA_OFFSET, source, xbeel_timestamp);
 #endif
-    LED_TOGGLE(3);
+    LED_TOGGLE(LED_GREEN);
     goto restart;
   }
   return;
@@ -548,7 +549,7 @@ void log_pprz(unsigned char c, unsigned char source)
 #ifndef USE_MAX11040
     log_payload(pprzl_payload_len, source, pprzl_timestamp);
 #endif
-    LED_TOGGLE(3);
+    LED_TOGGLE(LED_GREEN);
     goto restart;
   }
   return;
@@ -590,7 +591,7 @@ int do_log(void)
 #ifdef USE_MAX11040
       if ((max11040_data == MAX11040_DATA_AVAILABLE) &&
           (max11040_buf_in != max11040_buf_out)) {
-//        LED_TOGGLE(3);
+//        LED_TOGGLE(LED_GREEN);
         int i;
 
         max11040_data = MAX11040_IDLE;
@@ -616,38 +617,16 @@ int do_log(void)
 
 
 #ifdef USE_UART0
-  // #if LOG_OO_0
-  //     static unsigned char oo_init = UNINIT;
-  //     if (oo_init == OO_UNINIT) {
-  //       Uart0Transmit(OO_VERSION); //will reply with ACK if ready
-  //       oo_init = -1;
-  //     }
-  //     if (oo_init == OO_INIT) {
-  //       Uart0Transmit(OO_INTSET); //set the spectrometer integration time
-  //       unsigned int intTime = OO_INTTIME;
-  //       unsigned char timeLow,timeHigh;
-  //       timeLow = (char)intTime;
-  //       timeHigh = (char)(intTime >> 8);
-  //       Uart0Transmit(timeHigh);
-  //       Uart0Transmit(timeLow);
-  //     }
-  //     if (oo_init == OO_GOT_ITIME) {
-  //       Uart0Transmit(OO_SAMPLE); //tell oo to collect data
-  //       oo_init = -1;
-  //       // LED_TOGGLE(2);
-  //       // sys_time_usleep(1000000);
-  //       // oo_init++;
-  //     }
-  // #endif
-      temp = 0;
-      while (Uart0ChAvailable() && (temp++ < 128))
-      {
-//		LED_TOGGLE(3);
-			inc = Uart0Getch();
-  #if LOG_OO_0
-          // LED_TOGGLE(3);
-          oo_init = log_oo(inc, LOG_SOURCE_UART0);
-  #else
+        // temp = 0;
+//       while (Uart0ChAvailable() && (temp++ < 128))
+//       {
+// //		LED_TOGGLE(3);
+// 			inc = Uart0Getch();
+        temp = 0;
+        while (uart_char_available(&uart0) && (temp++ < 128))
+        {
+//			LED_TOGGLE(LED_GREEN);
+			inc = uart_getch(&uart1);
   #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART0);
   #else
@@ -655,7 +634,6 @@ int do_log(void)
             log_pprz(inc, LOG_SOURCE_UART0);
   #else
   #error no log transport protocol selected UART0
-  #endif
   #endif
   #endif
         }
@@ -710,10 +688,11 @@ int do_log(void)
         }
   #endif
         temp = 0;
-        while (Uart1ChAvailable() && (temp++ < 128))
+        while (uart_char_available(&uart1) && (temp++ < 128))
         {
-//			LED_TOGGLE(3);
-			inc = Uart1Getch();
+			// inc = Uart1Getch();
+//		LED_TOGGLE(LED_GREEN);
+			inc = uart_getch(&uart1);
   #if LOG_OO_1
             oo_init = log_oo(inc, LOG_SOURCE_UART1); //update oo_init for switch
   #else
@@ -730,7 +709,7 @@ int do_log(void)
         }
 #endif
     }
-    LED_OFF(3);
+    LED_OFF(LED_GREEN);
 
     file_fclose( &filew );
     fs_umount( &efs.myFs ) ;
@@ -742,6 +721,7 @@ int main(void)
 {
   int waitloop, ledcount, logstatus;
   main_init();
+
 
 #ifdef _DEBUG_BOARD_
   while(1)
@@ -776,12 +756,19 @@ int main(void)
   }
 #endif
 
+  // Direct SD Reader Mode
+  if ((IO0PIN & _BV(VBUS_PIN))>>VBUS_PIN)
+  {
+    LED_OFF(LED_YELLOW);
+    LED_ON(LED_RED);
+    main_mass_storage();
+  }
 
   while(1)
   {
-    LED_ON(2);
+    LED_ON(LED_YELLOW);
     logstatus = do_log();
-    LED_OFF(2);
+    LED_OFF(LED_YELLOW);
 
     /* if there is an error initializing the file system (ex. No SD card)
     flash the LEDs angrily*/
@@ -805,9 +792,9 @@ int main(void)
       {
         if (ledcount++ > 9) {
           ledcount=0;
-          LED_ON(2);
+          LED_ON(LED_YELLOW);
         } else {
-          LED_OFF(2);
+          LED_OFF(LED_YELLOW);
         }
         if (((IO0PIN & _BV(LOG_STOP_KEY))>>LOG_STOP_KEY) == 1) {
           waitloop=0;
@@ -818,12 +805,12 @@ int main(void)
 
       if ((IO0PIN & _BV(VBUS_PIN))>>VBUS_PIN)
       {
-        LED_OFF(2);
-        LED_ON(1);
+        LED_OFF(LED_YELLOW);
+        LED_ON(LED_RED);
         main_mass_storage();
       }
     }
-    LED_ON(2);
+    LED_ON(LED_YELLOW);
     while (((IO0PIN & _BV(LOG_STOP_KEY))>>LOG_STOP_KEY) == 0);
   }
 
@@ -835,12 +822,15 @@ static inline void main_init( void ) {
   sys_time_init();
   led_init();
 
+
 #ifdef USE_MAX11040
   max11040_init_ssp();
   max11040_init();
 #endif
 
   mcu_int_enable();
+
+  PINSEL2 = ~ (0x0c);
 }
 
 static inline void main_periodic_task( void ) {

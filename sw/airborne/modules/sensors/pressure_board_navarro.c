@@ -26,12 +26,12 @@
 
 
 #include "pressure_board_navarro.h"
-#include "estimator.h"
+#include "state.h"
 
 /* Default I2C device on tiny is i2c0
  */
-#ifndef PBN_I2C_DEVICE
-#define PBN_I2C_DEVICE i2c0
+#ifndef PBN_I2C_DEV
+#define PBN_I2C_DEV i2c0
 #endif
 
 /* Sensor I2C slave address */
@@ -96,7 +96,7 @@ void pbn_periodic( void ) {
 
   // Initiate next read
   pbn_trans.buf[0] = 0;
-  I2CTransceive(PBN_I2C_DEVICE, pbn_trans, PBN_I2C_ADDR, 1, 4);
+  i2c_transceive(&PBN_I2C_DEV, &pbn_trans, PBN_I2C_ADDR, 1, 4);
 
 }
 
@@ -140,10 +140,8 @@ void pbn_read_event( void ) {
 
       pbn_airspeed = (airspeed_filter*pbn_airspeed + tmp_airspeed) / (airspeed_filter + 1.);
 #if USE_AIRSPEED
-      EstimatorSetAirspeed(pbn_airspeed);
+      stateSetAirspeed_f(&pbn_airspeed);
 #endif
-      //alt_kalman(pbn_altitude);
-
     }
 
   }

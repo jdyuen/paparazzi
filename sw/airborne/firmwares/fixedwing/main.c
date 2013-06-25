@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2005 Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -19,11 +17,10 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
- *
  */
 
 /**
- * @file main.c
+ * @file firmwares/fixedwing/main.c
  * Main loop used both on single and dual MCU configuration.
  */
 

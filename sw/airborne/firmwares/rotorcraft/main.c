@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2010 The Paparazzi Team
  *
  * This file is part of Paparazzi.
@@ -22,6 +20,12 @@
  *
  */
 
+/**
+ * @file firmwares/rotorcraft/main.c
+ *
+ * Rotorcraft main loop.
+ */
+
 #define MODULES_C
 
 #include <inttypes.h>
@@ -34,20 +38,20 @@
 #include "subsystems/datalink/datalink.h"
 #include "subsystems/settings.h"
 #include "subsystems/datalink/xbee.h"
+#if DATALINK == UDP
+#include "subsystems/datalink/udp.h"
+#endif
 
-#include "firmwares/rotorcraft/commands.h"
-#include "firmwares/rotorcraft/actuators.h"
-
-#if defined RADIO_CONTROL
-#include "subsystems/radio_control.h"
-#pragma message "CAUTION! RadioControl roll and yaw channel inputs have been reversed to follow aerospace sign conventions.\n You will have to change your radio control xml file to get a positive value when pushing roll stick right and a positive value when pushing yaw stick right!"
+#include "subsystems/commands.h"
+#include "subsystems/actuators.h"
+#if USE_MOTOR_MIXING
+#include "subsystems/actuators/motor_mixing.h"
 #endif
 
 #include "subsystems/imu.h"
 #include "subsystems/gps.h"
 
 #include "subsystems/sensors/baro.h"
-#include "baro_board.h"
 
 #include "subsystems/electrical.h"
 
@@ -59,6 +63,8 @@
 #include "subsystems/ahrs.h"
 #include "subsystems/ins.h"
 
+#include "state.h"
+
 #include "firmwares/rotorcraft/main.h"
 
 #ifdef SITL
@@ -66,6 +72,26 @@
 #endif
 
 #include "generated/modules.h"
+
+
+/* if PRINT_CONFIG is defined, print some config options */
+PRINT_CONFIG_VAR(PERIODIC_FREQUENCY)
+
+#ifndef TELEMETRY_FREQUENCY
+#define TELEMETRY_FREQUENCY 60
+#endif
+PRINT_CONFIG_VAR(TELEMETRY_FREQUENCY)
+
+#ifndef MODULES_FREQUENCY
+#define MODULES_FREQUENCY 512
+#endif
+PRINT_CONFIG_VAR(MODULES_FREQUENCY)
+
+#ifndef BARO_PERIODIC_FREQUENCY
+#define BARO_PERIODIC_FREQUENCY 50
+#endif
+PRINT_CONFIG_VAR(BARO_PERIODIC_FREQUENCY)
+
 
 static inline void on_gyro_event( void );
 static inline void on_accel_event( void );
@@ -76,6 +102,7 @@ static inline void on_mag_event( void );
 
 
 tid_t main_periodic_tid; ///< id for main_periodic() timer
+tid_t modules_tid;       ///< id for modules_periodic_task() timer
 tid_t failsafe_tid;      ///< id for failsafe_check() timer
 tid_t radio_control_tid; ///< id for radio_control_periodic_task() timer
 tid_t electrical_tid;    ///< id for electrical_periodic() timer
@@ -100,12 +127,14 @@ STATIC_INLINE void main_init( void ) {
 
   electrical_init();
 
-  actuators_init();
-  radio_control_init();
+  stateInit();
 
-#if DATALINK == XBEE
-  xbee_init();
+  actuators_init();
+#if USE_MOTOR_MIXING
+  motor_mixing_init();
 #endif
+
+  radio_control_init();
 
   baro_init();
   imu_init();
@@ -130,18 +159,29 @@ STATIC_INLINE void main_init( void ) {
 
   mcu_int_enable();
 
+#if DATALINK == XBEE
+  xbee_init();
+#endif
+
+#if DATALINK == UDP
+  udp_init();
+#endif
+
   // register the timers for the periodic functions
   main_periodic_tid = sys_time_register_timer((1./PERIODIC_FREQUENCY), NULL);
+  modules_tid = sys_time_register_timer(1./MODULES_FREQUENCY, NULL);
   radio_control_tid = sys_time_register_timer((1./60.), NULL);
   failsafe_tid = sys_time_register_timer(0.05, NULL);
   electrical_tid = sys_time_register_timer(0.1, NULL);
-  baro_tid = sys_time_register_timer(0.02, NULL);
-  telemetry_tid = sys_time_register_timer((1./60.), NULL);
+  baro_tid = sys_time_register_timer(1./BARO_PERIODIC_FREQUENCY, NULL);
+  telemetry_tid = sys_time_register_timer((1./TELEMETRY_FREQUENCY), NULL);
 }
 
 STATIC_INLINE void handle_periodic_tasks( void ) {
   if (sys_time_check_and_ack_timer(main_periodic_tid))
     main_periodic();
+  if (sys_time_check_and_ack_timer(modules_tid))
+    modules_periodic_task();
   if (sys_time_check_and_ack_timer(radio_control_tid))
     radio_control_periodic_task();
   if (sys_time_check_and_ack_timer(failsafe_tid))
@@ -161,9 +201,8 @@ STATIC_INLINE void main_periodic( void ) {
   /* run control loops */
   autopilot_periodic();
   /* set actuators     */
-  actuators_set(autopilot_motors_on);
-
-  modules_periodic_task();
+  //actuators_set(autopilot_motors_on);
+  SetActuatorsFromCommands(commands, autopilot_mode);
 
   if (autopilot_in_flight) {
     RunOnceEvery(PERIODIC_FREQUENCY, { autopilot_flight_time++; datalink_time++; });
@@ -185,8 +224,10 @@ STATIC_INLINE void failsafe_check( void ) {
   }
 
 #if USE_GPS
-  if (radio_control.status != RC_OK &&
-      autopilot_mode == AP_MODE_NAV &&
+  if (autopilot_mode == AP_MODE_NAV &&
+#if NO_GPS_LOST_WITH_RC_VALID
+      radio_control.status != RC_OK &&
+#endif
       GpsIsLost())
   {
     autopilot_set_mode(AP_MODE_FAILSAFE);
@@ -212,7 +253,7 @@ STATIC_INLINE void main_event( void ) {
   GpsEvent(on_gps_event);
 #endif
 
-#ifdef FAILSAFE_GROUND_DETECT
+#if FAILSAFE_GROUND_DETECT || KILL_ON_GROUND_DETECT
   DetectGroundEvent();
 #endif
 

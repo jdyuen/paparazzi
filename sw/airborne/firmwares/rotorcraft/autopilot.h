@@ -19,6 +19,13 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file firmwares/rotorcraft/autopilot.h
+ *
+ * Autopilot modes.
+ *
+ */
+
 #ifndef AUTOPILOT_H
 #define AUTOPILOT_H
 
@@ -42,8 +49,9 @@
 #define AP_MODE_HOVER_CLIMB       10
 #define AP_MODE_HOVER_Z_HOLD      11
 #define AP_MODE_NAV               12
-#define AP_MODE_RC_DIRECT	  13	// Safety Pilot Direct Commands for helicopter direct control: appropriately chosen as mode "13"
-
+#define AP_MODE_RC_DIRECT         13	// Safety Pilot Direct Commands for helicopter direct control: appropriately chosen as mode "13"
+#define AP_MODE_CARE_FREE_DIRECT  14
+#define AP_MODE_FORWARD           15
 
 extern uint8_t autopilot_mode;
 extern uint8_t autopilot_mode_auto2;
@@ -65,8 +73,8 @@ extern bool_t autopilot_detect_ground_once;
 
 extern uint16_t autopilot_flight_time;
 
-
-
+/** Default RC mode.
+ */
 #ifndef MODE_MANUAL
 #define MODE_MANUAL AP_MODE_RATE_DIRECT
 #endif
@@ -78,20 +86,23 @@ extern uint16_t autopilot_flight_time;
 #endif
 
 
-#define TRESHOLD_1_PPRZ (MIN_PPRZ / 2)
-#define TRESHOLD_2_PPRZ (MAX_PPRZ / 2)
+#define THRESHOLD_1_PPRZ (MIN_PPRZ / 2)
+#define THRESHOLD_2_PPRZ (MAX_PPRZ / 2)
 
 #define AP_MODE_OF_PPRZ(_rc, _mode) {               \
-    if      (_rc > TRESHOLD_2_PPRZ)                 \
+    if      (_rc > THRESHOLD_2_PPRZ)                 \
       _mode = autopilot_mode_auto2;                 \
-    else if (_rc > TRESHOLD_1_PPRZ)					\
+    else if (_rc > THRESHOLD_1_PPRZ)					\
       _mode = MODE_AUTO1;                           \
     else                                            \
       _mode = MODE_MANUAL;                          \
   }
 
-#define autopilot_KillThrottle(_v) { \
-    autopilot_set_motors_on(_v);     \
+#define autopilot_KillThrottle(_kill) { \
+    if (_kill)                          \
+      autopilot_set_motors_on(FALSE);   \
+    else                                \
+      autopilot_set_motors_on(TRUE);    \
   }
 
 #ifdef POWER_SWITCH_LED
@@ -106,13 +117,40 @@ extern uint16_t autopilot_flight_time;
   }
 #endif
 
-#ifndef TRESHOLD_GROUND_DETECT
-#define TRESHOLD_GROUND_DETECT ACCEL_BFP_OF_REAL(15.)
+/** Set Rotorcraft commands.
+ *  Limit thrust and/or yaw depending of the in_flight
+ *  and motors_on flag status
+ */
+#ifndef ROTORCRAFT_COMMANDS_YAW_ALWAYS_ENABLED
+#define SetRotorcraftCommands(_cmd, _in_flight,  _motor_on) { \
+  if (!(_in_flight)) { _cmd[COMMAND_YAW] = 0; }               \
+  if (!(_motor_on)) { _cmd[COMMAND_THRUST] = 0; }             \
+  commands[COMMAND_ROLL] = _cmd[COMMAND_ROLL];                \
+  commands[COMMAND_PITCH] = _cmd[COMMAND_PITCH];              \
+  commands[COMMAND_YAW] = _cmd[COMMAND_YAW];                  \
+  commands[COMMAND_THRUST] = _cmd[COMMAND_THRUST];            \
+}
+#else
+#define SetRotorcraftCommands(_cmd, _in_flight,  _motor_on) { \
+  if (!(_motor_on)) { _cmd[COMMAND_THRUST] = 0; }             \
+  commands[COMMAND_ROLL] = _cmd[COMMAND_ROLL];                \
+  commands[COMMAND_PITCH] = _cmd[COMMAND_PITCH];              \
+  commands[COMMAND_YAW] = _cmd[COMMAND_YAW];                  \
+  commands[COMMAND_THRUST] = _cmd[COMMAND_THRUST];            \
+}
 #endif
+
+/** Z-acceleration threshold to detect ground in m/s^2 */
+#ifndef THRESHOLD_GROUND_DETECT
+#define THRESHOLD_GROUND_DETECT 25.0
+#endif
+/** Ground detection based on vertical acceleration.
+ */
 static inline void DetectGroundEvent(void) {
   if (autopilot_mode == AP_MODE_FAILSAFE || autopilot_detect_ground_once) {
-    if (ins_ltp_accel.z < -TRESHOLD_GROUND_DETECT ||
-        ins_ltp_accel.z > TRESHOLD_GROUND_DETECT) {
+    struct NedCoor_f* accel = stateGetAccelNed_f();
+    if (accel->z < -THRESHOLD_GROUND_DETECT ||
+        accel->z > THRESHOLD_GROUND_DETECT) {
       autopilot_detect_ground = TRUE;
       autopilot_detect_ground_once = FALSE;
     }

@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2006- Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -19,11 +17,12 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
- *
  */
 
-/** \file ap_downlink.h
- *  \brief Set of macros defining the periodic telemetry messages of AP process
+/**
+ * @file firmwares/fixedwing/ap_downlink.h
+ *
+ * Set of macros defining the periodic telemetry messages of AP process.
  *
  * The PeriodicSendAp() macro is generated from the telemetry description
  * (named in conf.xml, usually in conf/telemetry directory). This macro
@@ -38,6 +37,7 @@
 #include <inttypes.h>
 
 #include "generated/airframe.h"
+#include "state.h"
 
 #ifndef DOWNLINK_DEVICE
 #define DOWNLINK_DEVICE DOWNLINK_AP_DEVICE
@@ -62,7 +62,7 @@
                           &v_ctl_throttle_slewed,       \
                           &vsupply,                     \
                           &amps,                        \
-                          &estimator_flight_time,       \
+                          &autopilot_flight_time,       \
                           &kill_throttle,				\
                           &block_time,					\
                           &stage_time,					\
@@ -86,11 +86,17 @@
 
 
 #define PERIODIC_SEND_ATTITUDE(_trans, _dev) Downlink({ \
-      DOWNLINK_SEND_ATTITUDE(_trans, _dev, &estimator_phi, &estimator_psi, &estimator_theta); \
+    struct FloatEulers* att = stateGetNedToBodyEulers_f(); \
+    DOWNLINK_SEND_ATTITUDE(_trans, _dev, &(att->phi), &(att->psi), &(att->theta)); \
 })
 
 
-#define PERIODIC_SEND_DESIRED(_trans, _dev) DOWNLINK_SEND_DESIRED(_trans, _dev, &h_ctl_roll_setpoint, &h_ctl_pitch_loop_setpoint, &h_ctl_course_setpoint, &desired_x, &desired_y, &v_ctl_altitude_setpoint, &v_ctl_climb_setpoint);
+#ifndef USE_AIRSPEED
+#define PERIODIC_SEND_DESIRED(_trans, _dev) { float v_ctl_auto_airspeed_setpoint = NOMINAL_AIRSPEED;  DOWNLINK_SEND_DESIRED(_trans, _dev, &h_ctl_roll_setpoint, &h_ctl_pitch_loop_setpoint, &h_ctl_course_setpoint, &desired_x, &desired_y, &v_ctl_altitude_setpoint, &v_ctl_climb_setpoint, &v_ctl_auto_airspeed_setpoint);}
+#else
+#define PERIODIC_SEND_DESIRED(_trans, _dev) DOWNLINK_SEND_DESIRED(_trans, _dev, &h_ctl_roll_setpoint, &h_ctl_pitch_loop_setpoint, &h_ctl_course_setpoint, &desired_x, &desired_y, &v_ctl_altitude_setpoint, &v_ctl_climb_setpoint, &v_ctl_auto_airspeed_setpoint);
+#endif
+
 
 #if USE_INFRARED
 #define PERIODIC_SEND_STATE_FILTER_STATUS(_trans, _dev) { uint16_t contrast = abs(infrared.roll) + abs(infrared.pitch) + abs(infrared.top); uint8_t mde = 3; if (contrast < 50) mde = 7; DOWNLINK_SEND_STATE_FILTER_STATUS(_trans, _dev, &mde, &contrast); }
@@ -181,9 +187,13 @@
 #define PERIODIC_SEND_IMU(_trans, _dev) {}
 #endif
 
-#define PERIODIC_SEND_ESTIMATOR(_trans, _dev) DOWNLINK_SEND_ESTIMATOR(_trans, _dev, &estimator_z, &estimator_z_dot)
+#define PERIODIC_SEND_ESTIMATOR(_trans, _dev) DOWNLINK_SEND_ESTIMATOR(_trans, _dev, &(stateGetPositionUtm_f()->alt), &(stateGetSpeedEnu_f()->z))
 
-#define SEND_NAVIGATION(_trans, _dev) Downlink({ uint8_t _circle_count = NavCircleCount(); DOWNLINK_SEND_NAVIGATION(_trans, _dev, &nav_block, &nav_stage, &estimator_x, &estimator_y, &dist2_to_wp, &dist2_to_home, &_circle_count, &nav_oval_count);})
+#define SEND_NAVIGATION(_trans, _dev) Downlink({ \
+    uint8_t _circle_count = NavCircleCount(); \
+    struct EnuCoor_f* pos = stateGetPositionEnu_f(); \
+    DOWNLINK_SEND_NAVIGATION(_trans, _dev, &nav_block, &nav_stage, &(pos->x), &(pos->y), &dist2_to_wp, &dist2_to_home, &_circle_count, &nav_oval_count); \
+    })
 
 #define PERIODIC_SEND_NAVIGATION(_trans, _dev) SEND_NAVIGATION(_trans, _dev)
 
@@ -205,10 +215,12 @@
 
 #define PERIODIC_SEND_RANGEFINDER(_trans, _dev) DOWNLINK_SEND_RANGEFINDER(_trans, _dev, &rangemeter, &ctl_grz_z_dot, &ctl_grz_z_dot_sum_err, &ctl_grz_z_dot_setpoint, &ctl_grz_z_sum_err, &ctl_grz_z_setpoint, &flying)
 
-#define PERIODIC_SEND_TUNE_ROLL(_trans, _dev) DOWNLINK_SEND_TUNE_ROLL(_trans, _dev, &estimator_p,&estimator_phi, &h_ctl_roll_setpoint);
+#define PERIODIC_SEND_TUNE_ROLL(_trans, _dev) DOWNLINK_SEND_TUNE_ROLL(_trans, _dev, &(stateGetBodyRates_f()->p), &(stateGetNedToBodyEulers_f()->phi), &h_ctl_roll_setpoint);
 
-#if USE_GPS || USE_GPS_XSENS || defined SITL
+#if USE_GPS || defined SITL
 #define PERIODIC_SEND_GPS_SOL(_trans, _dev) DOWNLINK_SEND_GPS_SOL(_trans, _dev, &gps.pacc, &gps.sacc, &gps.pdop, &gps.num_sv)
+#else
+#define PERIODIC_SEND_GPS_SOL(_trans, _dev) {}
 #endif
 
 #define PERIODIC_SEND_GPS(_trans, _dev) {                                      \
@@ -218,7 +230,7 @@
     DOWNLINK_SEND_GPS(_trans, _dev, &gps.fix, &gps.utm_pos.east, &gps.utm_pos.north, &course, &gps.hmsl, &gps.gspeed, &climb, &gps.week, &gps.tow, &gps.utm_pos.zone, &i); \
     if ((gps.fix != GPS_FIX_3D) && (i >= gps.nb_channels)) i = 0;                                    \
     if (i >= gps.nb_channels * 2) i = 0;                                    \
-    if (i < gps.nb_channels && gps.svinfos[i].cno > 0) { \
+    if (i < gps.nb_channels && ((gps.fix != GPS_FIX_3D) || (gps.svinfos[i].cno > 0))) { \
       DOWNLINK_SEND_SVINFO(_trans, _dev, &i, &gps.svinfos[i].svid, &gps.svinfos[i].flags, &gps.svinfos[i].qi, &gps.svinfos[i].cno, &gps.svinfos[i].elev, &gps.svinfos[i].azim); \
     }                                                                   \
     i++;                                                                \
@@ -246,20 +258,20 @@
   }
 
 #define PERIODIC_SEND_GPS_LLA(_trans, _dev) {               \
+    uint8_t err = 0;                                        \
     int16_t climb = -gps.ned_vel.z;                         \
     int16_t course = (DegOfRad(gps.course)/((int32_t)1e6)); \
     DOWNLINK_SEND_GPS_LLA( _trans, _dev,                    \
                            &gps.lla_pos.lat,                \
                            &gps.lla_pos.lon,                \
                            &gps.lla_pos.alt,                \
-                           &gps.hmsl,                       \
                            &course,                         \
                            &gps.gspeed,                     \
                            &climb,                          \
                            &gps.week,                       \
                            &gps.tow,                        \
                            &gps.fix,                        \
-                           &gps.fix);                       \
+                           &err);                           \
   }
 #endif
 
@@ -277,8 +289,7 @@
 #define PERIODIC_SEND_SCP_STATUS(_trans, _dev) {}
 #endif
 
-//FIXME: we need a better switch here...
-#if BOARD_HAS_BARO && USE_BARO_AS_ALTIMETER
+#if USE_BAROMETER
 #include "subsystems/sensors/baro.h"
 #define PERIODIC_SEND_BARO_RAW(_trans, _dev) {  \
     DOWNLINK_SEND_BARO_RAW(_trans, _dev,        \
@@ -290,9 +301,12 @@
 #endif
 
 #ifdef MEASURE_AIRSPEED
-#define PERIODIC_SEND_AIRSPEED(_trans, _dev) DOWNLINK_SEND_AIRSPEED (_trans, _dev, &estimator_airspeed, &estimator_airspeed, &estimator_airspeed, &estimator_airspeed)
+#define PERIODIC_SEND_AIRSPEED(_trans, _dev) { \
+  float* airspeed = stateGetAirspeed_f(); \
+  DOWNLINK_SEND_AIRSPEED (_trans, _dev, airspeed, airspeed, airspeed, airspeed); \
+}
 #elif USE_AIRSPEED
-#define PERIODIC_SEND_AIRSPEED(_trans, _dev) DOWNLINK_SEND_AIRSPEED (_trans, _dev, &estimator_airspeed, &v_ctl_auto_airspeed_setpoint, &v_ctl_auto_airspeed_controlled, &v_ctl_auto_groundspeed_setpoint)
+#define PERIODIC_SEND_AIRSPEED(_trans, _dev) DOWNLINK_SEND_AIRSPEED (_trans, _dev, stateGetAirspeed_f(), &v_ctl_auto_airspeed_setpoint, &v_ctl_auto_airspeed_controlled, &v_ctl_auto_groundspeed_setpoint)
 #else
 #define PERIODIC_SEND_AIRSPEED(_trans, _dev) {}
 #endif

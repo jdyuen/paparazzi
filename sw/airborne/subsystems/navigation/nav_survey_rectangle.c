@@ -1,5 +1,34 @@
+/*
+ * Copyright (C) 2007-2009  ENAC, Pascal Brisset, Antoine Drouin
+ *
+ * This file is part of paparazzi.
+ *
+ * paparazzi is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * paparazzi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
+/**
+ * @file subsystems/navigation/nav_survey_rectangle.c
+ *
+ * Automatic survey of a rectangle for fixedwings.
+ *
+ * Rectangle is defined by two points, sweep can be south-north or west-east.
+ */
+
 #include "subsystems/navigation/nav_survey_rectangle.h"
-#include "estimator.h"
+#include "state.h"
 
 static struct point survey_from;
 static struct point survey_to;
@@ -29,8 +58,8 @@ void nav_survey_rectangle_init(uint8_t wp1, uint8_t wp2, float grid, survey_orie
   survey_orientation = so;
 
   if (survey_orientation == NS) {
-    survey_from.x = survey_to.x = Min(Max(estimator_x, nav_survey_west+grid/2.), nav_survey_east-grid/2.);
-    if (estimator_y > nav_survey_north || (estimator_y > nav_survey_south && estimator_hspeed_dir > M_PI/2. && estimator_hspeed_dir < 3*M_PI/2)) {
+    survey_from.x = survey_to.x = Min(Max(stateGetPositionEnu_f()->x, nav_survey_west+grid/2.), nav_survey_east-grid/2.);
+    if (stateGetPositionEnu_f()->y > nav_survey_north || (stateGetPositionEnu_f()->y > nav_survey_south && (*stateGetHorizontalSpeedDir_f()) > M_PI/2. && (*stateGetHorizontalSpeedDir_f()) < 3*M_PI/2)) {
       survey_to.y = nav_survey_south;
       survey_from.y = nav_survey_north;
     } else {
@@ -38,8 +67,8 @@ void nav_survey_rectangle_init(uint8_t wp1, uint8_t wp2, float grid, survey_orie
       survey_to.y = nav_survey_north;
     }
   } else { /* survey_orientation == WE */
-    survey_from.y = survey_to.y = Min(Max(estimator_y, nav_survey_south+grid/2.), nav_survey_north-grid/2.);
-    if (estimator_x > nav_survey_east || (estimator_x > nav_survey_west && estimator_hspeed_dir > M_PI)) {
+    survey_from.y = survey_to.y = Min(Max(stateGetPositionEnu_f()->y, nav_survey_south+grid/2.), nav_survey_north-grid/2.);
+    if (stateGetPositionEnu_f()->x > nav_survey_east || (stateGetPositionEnu_f()->x > nav_survey_west && (*stateGetHorizontalSpeedDir_f()) > M_PI)) {
       survey_to.x = nav_survey_west;
       survey_from.x = nav_survey_east;
     } else {
@@ -79,64 +108,64 @@ void nav_survey_rectangle(uint8_t wp1, uint8_t wp2) {
   }
 
   if (! survey_uturn) { /* S-N, N-S, W-E or E-W straight route */
-    if ((estimator_y < nav_survey_north && SurveyGoingNorth()) ||
-        (estimator_y > nav_survey_south && SurveyGoingSouth()) ||
-    (estimator_x < nav_survey_east && SurveyGoingEast()) ||
-        (estimator_x > nav_survey_west && SurveyGoingWest())) {
+    if ((stateGetPositionEnu_f()->y < nav_survey_north && SurveyGoingNorth()) ||
+        (stateGetPositionEnu_f()->y > nav_survey_south && SurveyGoingSouth()) ||
+        (stateGetPositionEnu_f()->x < nav_survey_east && SurveyGoingEast()) ||
+        (stateGetPositionEnu_f()->x > nav_survey_west && SurveyGoingWest())) {
       /* Continue ... */
       nav_route_xy(survey_from.x, survey_from.y, survey_to.x, survey_to.y);
     } else {
       if (survey_orientation == NS) {
-    /* North or South limit reached, prepare U-turn and next leg */
-    float x0 = survey_from.x; /* Current longitude */
-    if (x0+nav_survey_shift < nav_survey_west || x0+nav_survey_shift > nav_survey_east) {
-      x0 += nav_survey_shift / 2;
-      nav_survey_shift = -nav_survey_shift;
-    }
+        /* North or South limit reached, prepare U-turn and next leg */
+        float x0 = survey_from.x; /* Current longitude */
+        if (x0+nav_survey_shift < nav_survey_west || x0+nav_survey_shift > nav_survey_east) {
+          x0 += nav_survey_shift / 2;
+          nav_survey_shift = -nav_survey_shift;
+        }
 
-    x0 = x0 + nav_survey_shift; /* Longitude of next leg */
-    survey_from.x = survey_to.x = x0;
+        x0 = x0 + nav_survey_shift; /* Longitude of next leg */
+        survey_from.x = survey_to.x = x0;
 
-    /* Swap South and North extremities */
-    float tmp = survey_from.y;
-    survey_from.y = survey_to.y;
-    survey_to.y = tmp;
+        /* Swap South and North extremities */
+        float tmp = survey_from.y;
+        survey_from.y = survey_to.y;
+        survey_to.y = tmp;
 
-    /** Do half a circle around WP 0 */
-    waypoints[0].x = x0 - nav_survey_shift/2.;
-    waypoints[0].y = survey_from.y;
+        /** Do half a circle around WP 0 */
+        waypoints[0].x = x0 - nav_survey_shift/2.;
+        waypoints[0].y = survey_from.y;
 
-      /* Computes the right direction for the circle */
-    survey_radius = nav_survey_shift / 2.;
-    if (SurveyGoingNorth()) {
-      survey_radius = -survey_radius;
-    }
+        /* Computes the right direction for the circle */
+        survey_radius = nav_survey_shift / 2.;
+        if (SurveyGoingNorth()) {
+          survey_radius = -survey_radius;
+        }
       } else { /* (survey_orientation == WE) */
-    /* East or West limit reached, prepare U-turn and next leg */
-    /* There is a y0 declared in math.h (for ARM) !!! */
-    float my_y0 = survey_from.y; /* Current latitude */
-    if (my_y0+nav_survey_shift < nav_survey_south || my_y0+nav_survey_shift > nav_survey_north) {
-      my_y0 += nav_survey_shift / 2;
-      nav_survey_shift = -nav_survey_shift;
-    }
+        /* East or West limit reached, prepare U-turn and next leg */
+        /* There is a y0 declared in math.h (for ARM) !!! */
+        float my_y0 = survey_from.y; /* Current latitude */
+        if (my_y0+nav_survey_shift < nav_survey_south || my_y0+nav_survey_shift > nav_survey_north) {
+          my_y0 += nav_survey_shift / 2;
+          nav_survey_shift = -nav_survey_shift;
+        }
 
-    my_y0 = my_y0 + nav_survey_shift; /* Longitude of next leg */
-    survey_from.y = survey_to.y = my_y0;
+        my_y0 = my_y0 + nav_survey_shift; /* Longitude of next leg */
+        survey_from.y = survey_to.y = my_y0;
 
-    /* Swap West and East extremities */
-    float tmp = survey_from.x;
-    survey_from.x = survey_to.x;
-    survey_to.x = tmp;
+        /* Swap West and East extremities */
+        float tmp = survey_from.x;
+        survey_from.x = survey_to.x;
+        survey_to.x = tmp;
 
-    /** Do half a circle around WP 0 */
-    waypoints[0].x = survey_from.x;
-    waypoints[0].y = my_y0 - nav_survey_shift/2.;
+        /** Do half a circle around WP 0 */
+        waypoints[0].x = survey_from.x;
+        waypoints[0].y = my_y0 - nav_survey_shift/2.;
 
-      /* Computes the right direction for the circle */
-    survey_radius = nav_survey_shift / 2.;
-    if (SurveyGoingWest()) {
-      survey_radius = -survey_radius;
-    }
+        /* Computes the right direction for the circle */
+        survey_radius = nav_survey_shift / 2.;
+        if (SurveyGoingWest()) {
+          survey_radius = -survey_radius;
+        }
       }
 
       nav_in_segment = FALSE;
@@ -145,9 +174,9 @@ void nav_survey_rectangle(uint8_t wp1, uint8_t wp2) {
     }
   } else { /* U-turn */
     if ((SurveyGoingNorth() && NavCourseCloseTo(0)) ||
-    (SurveyGoingSouth() && NavCourseCloseTo(180)) ||
-    (SurveyGoingEast() && NavCourseCloseTo(90)) ||
-    (SurveyGoingWest() && NavCourseCloseTo(270))) {
+        (SurveyGoingSouth() && NavCourseCloseTo(180)) ||
+        (SurveyGoingEast() && NavCourseCloseTo(90)) ||
+        (SurveyGoingWest() && NavCourseCloseTo(270))) {
       /* U-turn finished, back on a segment */
       survey_uturn = FALSE;
       nav_in_circle = FALSE;

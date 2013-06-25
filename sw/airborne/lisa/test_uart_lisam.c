@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -21,11 +19,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#include <stm32/rcc.h>
-#include <stm32/gpio.h>
+//#include <libopencm3/stm32/f1/rcc.h>
+//#include <libopencm3/stm32/f1/gpio.h>
 
-#include <stm32/flash.h>
-#include <stm32/misc.h>
+//#include <libopencm3/stm32/f1/flash.h>
+
+//#include <libopencm3/cm3/common.h>
 
 #include BOARD_CONFIG
 #include "mcu.h"
@@ -56,16 +55,16 @@ static inline void main_init( void ) {
 static inline void main_periodic( void ) {
   char ch;
 
-  Uart1Transmit('a');
-  Uart2Transmit('b');
-  Uart3Transmit('c');
-  Uart5Transmit('d');
+  uart_transmit(&uart1, 'a');
+  uart_transmit(&uart2, 'b');
+  uart_transmit(&uart3, 'c');
+  uart_transmit(&uart5, 'd');
 
   LED_OFF(1);
   LED_OFF(2);
 
-  if (Uart1ChAvailable()) {
-    ch = Uart1Getch();
+  if (uart_char_available(&uart1)) {
+    ch = uart_getch(&uart1);
     if (ch == 'a') {
       LED_ON(1);
     } else {
@@ -73,8 +72,8 @@ static inline void main_periodic( void ) {
     }
   }
 
-  if (Uart2ChAvailable()) {
-    ch = Uart2Getch();
+  if (uart_char_available(&uart2)) {
+    ch =  uart_getch(&uart2);
     if (ch == 'b') {
       LED_ON(1);
     } else {
@@ -82,8 +81,8 @@ static inline void main_periodic( void ) {
     }
   }
 
-  if (Uart3ChAvailable()) {
-    ch = Uart3Getch();
+  if (uart_char_available(&uart3)) {
+    ch =  uart_getch(&uart3);
     if (ch == 'c') {
       LED_ON(1);
     } else {
@@ -91,8 +90,8 @@ static inline void main_periodic( void ) {
     }
   }
 
-  if (Uart5ChAvailable()) {
-    ch = Uart5Getch();
+  if (uart_char_available(&uart5)) {
+    ch =  uart_getch(&uart5);
     if (ch == 'd') {
       LED_ON(1);
     } else {

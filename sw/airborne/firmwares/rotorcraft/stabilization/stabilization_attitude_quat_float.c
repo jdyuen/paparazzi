@@ -1,6 +1,4 @@
 /*
- * $Id: stabilization_attitude_quat_float.c 3787 2009-07-24 15:33:54Z poine $
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -21,65 +19,73 @@
  * Boston, MA 02111-1307, USA.
  */
 
-/** \file stabilization_attitude_quat_float.c
- * \brief Booz quaternion attitude stabilization
+/** @file firmwares/rotorcraft/stabilization/stabilization_attitude_quat_float.c
+ * @brief Quaternion attitude stabilization (floating point).
  */
 
 #include "firmwares/rotorcraft/stabilization.h"
+#include "firmwares/rotorcraft/stabilization/stabilization_attitude_rc_setpoint.h"
 
 #include <stdio.h>
 #include "math/pprz_algebra_float.h"
 #include "math/pprz_algebra_int.h"
-#include "subsystems/ahrs.h"
+#include "state.h"
 #include "generated/airframe.h"
-#include "stabilization_attitude_float.h"
-#include "stabilization_attitude_rc_setpoint.h"
 
-struct FloatAttitudeGains stabilization_gains[STABILIZATION_ATTITUDE_FLOAT_GAIN_NB];
+struct FloatAttitudeGains stabilization_gains[STABILIZATION_ATTITUDE_GAIN_NB];
 
 struct FloatQuat stabilization_att_sum_err_quat;
 struct FloatEulers stabilization_att_sum_err_eulers;
 
+struct FloatRates last_body_rate;
+
 float stabilization_att_fb_cmd[COMMANDS_NB];
 float stabilization_att_ff_cmd[COMMANDS_NB];
 
-static int gain_idx = STABILIZATION_ATTITUDE_FLOAT_GAIN_IDX_DEFAULT;
+static int gain_idx = STABILIZATION_ATTITUDE_GAIN_IDX_DEFAULT;
 
-static const float phi_pgain[] = STABILIZATION_ATTITUDE_FLOAT_PHI_PGAIN;
-static const float theta_pgain[] = STABILIZATION_ATTITUDE_FLOAT_THETA_PGAIN;
-static const float psi_pgain[] = STABILIZATION_ATTITUDE_FLOAT_PSI_PGAIN;
+static const float phi_pgain[] = STABILIZATION_ATTITUDE_PHI_PGAIN;
+static const float theta_pgain[] = STABILIZATION_ATTITUDE_THETA_PGAIN;
+static const float psi_pgain[] = STABILIZATION_ATTITUDE_PSI_PGAIN;
 
-static const float phi_dgain[] = STABILIZATION_ATTITUDE_FLOAT_PHI_DGAIN;
-static const float theta_dgain[] = STABILIZATION_ATTITUDE_FLOAT_THETA_DGAIN;
-static const float psi_dgain[] = STABILIZATION_ATTITUDE_FLOAT_PSI_DGAIN;
+static const float phi_dgain[] = STABILIZATION_ATTITUDE_PHI_DGAIN;
+static const float theta_dgain[] = STABILIZATION_ATTITUDE_THETA_DGAIN;
+static const float psi_dgain[] = STABILIZATION_ATTITUDE_PSI_DGAIN;
 
-static const float phi_igain[] = STABILIZATION_ATTITUDE_FLOAT_PHI_IGAIN;
-static const float theta_igain[] = STABILIZATION_ATTITUDE_FLOAT_THETA_IGAIN;
-static const float psi_igain[] = STABILIZATION_ATTITUDE_FLOAT_PSI_IGAIN;
+static const float phi_igain[] = STABILIZATION_ATTITUDE_PHI_IGAIN;
+static const float theta_igain[] = STABILIZATION_ATTITUDE_THETA_IGAIN;
+static const float psi_igain[] = STABILIZATION_ATTITUDE_PSI_IGAIN;
 
-static const float phi_ddgain[] = STABILIZATION_ATTITUDE_FLOAT_PHI_DDGAIN;
-static const float theta_ddgain[] = STABILIZATION_ATTITUDE_FLOAT_THETA_DDGAIN;
-static const float psi_ddgain[] = STABILIZATION_ATTITUDE_FLOAT_PSI_DDGAIN;
+static const float phi_ddgain[] = STABILIZATION_ATTITUDE_PHI_DDGAIN;
+static const float theta_ddgain[] = STABILIZATION_ATTITUDE_THETA_DDGAIN;
+static const float psi_ddgain[] = STABILIZATION_ATTITUDE_PSI_DDGAIN;
 
-static const float phi_dgain_d[] = STABILIZATION_ATTITUDE_FLOAT_PHI_DGAIN_D;
-static const float theta_dgain_d[] = STABILIZATION_ATTITUDE_FLOAT_THETA_DGAIN_D;
-static const float psi_dgain_d[] = STABILIZATION_ATTITUDE_FLOAT_PSI_DGAIN_D;
+static const float phi_dgain_d[] = STABILIZATION_ATTITUDE_PHI_DGAIN_D;
+static const float theta_dgain_d[] = STABILIZATION_ATTITUDE_THETA_DGAIN_D;
+static const float psi_dgain_d[] = STABILIZATION_ATTITUDE_PSI_DGAIN_D;
 
-static const float phi_pgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PHI_PGAIN_SURFACE;
-static const float theta_pgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_THETA_PGAIN_SURFACE;
-static const float psi_pgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PSI_PGAIN_SURFACE;
 
-static const float phi_dgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PHI_DGAIN_SURFACE;
-static const float theta_dgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_THETA_DGAIN_SURFACE;
-static const float psi_dgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PSI_DGAIN_SURFACE;
+#if defined COMMAND_ROLL_SURFACE && defined COMMAND_PITCH_SURFACE && defined COMMAND_YAW_SURFACE
+#define HAS_SURFACE_COMMANDS 1
+#endif
 
-static const float phi_igain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PHI_IGAIN_SURFACE;
-static const float theta_igain_surface[] = STABILIZATION_ATTITUDE_FLOAT_THETA_IGAIN_SURFACE;
-static const float psi_igain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PSI_IGAIN_SURFACE;
+#ifdef HAS_SURFACE_COMMANDS
+static const float phi_pgain_surface[] = STABILIZATION_ATTITUDE_PHI_PGAIN_SURFACE;
+static const float theta_pgain_surface[] = STABILIZATION_ATTITUDE_THETA_PGAIN_SURFACE;
+static const float psi_pgain_surface[] = STABILIZATION_ATTITUDE_PSI_PGAIN_SURFACE;
 
-static const float phi_ddgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PHI_DDGAIN_SURFACE;
-static const float theta_ddgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_THETA_DDGAIN_SURFACE;
-static const float psi_ddgain_surface[] = STABILIZATION_ATTITUDE_FLOAT_PSI_DDGAIN_SURFACE;
+static const float phi_dgain_surface[] = STABILIZATION_ATTITUDE_PHI_DGAIN_SURFACE;
+static const float theta_dgain_surface[] = STABILIZATION_ATTITUDE_THETA_DGAIN_SURFACE;
+static const float psi_dgain_surface[] = STABILIZATION_ATTITUDE_PSI_DGAIN_SURFACE;
+
+static const float phi_igain_surface[] = STABILIZATION_ATTITUDE_PHI_IGAIN_SURFACE;
+static const float theta_igain_surface[] = STABILIZATION_ATTITUDE_THETA_IGAIN_SURFACE;
+static const float psi_igain_surface[] = STABILIZATION_ATTITUDE_PSI_IGAIN_SURFACE;
+
+static const float phi_ddgain_surface[] = STABILIZATION_ATTITUDE_PHI_DDGAIN_SURFACE;
+static const float theta_ddgain_surface[] = STABILIZATION_ATTITUDE_THETA_DDGAIN_SURFACE;
+static const float psi_ddgain_surface[] = STABILIZATION_ATTITUDE_PSI_DDGAIN_SURFACE;
+#endif
 
 #define IERROR_SCALE 1024
 
@@ -87,25 +93,28 @@ void stabilization_attitude_init(void) {
 
   stabilization_attitude_ref_init();
 
-  for (int i = 0; i < STABILIZATION_ATTITUDE_FLOAT_GAIN_NB; i++) {
+  for (int i = 0; i < STABILIZATION_ATTITUDE_GAIN_NB; i++) {
     VECT3_ASSIGN(stabilization_gains[i].p, phi_pgain[i], theta_pgain[i], psi_pgain[i]);
     VECT3_ASSIGN(stabilization_gains[i].d, phi_dgain[i], theta_dgain[i], psi_dgain[i]);
     VECT3_ASSIGN(stabilization_gains[i].i, phi_igain[i], theta_igain[i], psi_igain[i]);
     VECT3_ASSIGN(stabilization_gains[i].dd, phi_ddgain[i], theta_ddgain[i], psi_ddgain[i]);
     VECT3_ASSIGN(stabilization_gains[i].rates_d, phi_dgain_d[i], theta_dgain_d[i], psi_dgain_d[i]);
+#ifdef HAS_SURFACE_COMMANDS
     VECT3_ASSIGN(stabilization_gains[i].surface_p, phi_pgain_surface[i], theta_pgain_surface[i], psi_pgain_surface[i]);
     VECT3_ASSIGN(stabilization_gains[i].surface_d, phi_dgain_surface[i], theta_dgain_surface[i], psi_dgain_surface[i]);
     VECT3_ASSIGN(stabilization_gains[i].surface_i, phi_igain_surface[i], theta_igain_surface[i], psi_igain_surface[i]);
     VECT3_ASSIGN(stabilization_gains[i].surface_dd, phi_ddgain_surface[i], theta_ddgain_surface[i], psi_ddgain_surface[i]);
+#endif
   }
 
   FLOAT_QUAT_ZERO( stabilization_att_sum_err_quat );
   FLOAT_EULERS_ZERO( stabilization_att_sum_err_eulers );
+  FLOAT_RATES_ZERO( last_body_rate );
 }
 
 void stabilization_attitude_gain_schedule(uint8_t idx)
 {
-  if (gain_idx >= STABILIZATION_ATTITUDE_FLOAT_GAIN_NB) {
+  if (gain_idx >= STABILIZATION_ATTITUDE_GAIN_NB) {
     // This could be bad -- Just say no.
     return;
   }
@@ -115,10 +124,28 @@ void stabilization_attitude_gain_schedule(uint8_t idx)
 
 void stabilization_attitude_enter(void) {
 
+  /* reset psi setpoint to current psi angle */
+  stab_att_sp_euler.psi = stabilization_attitude_get_heading_f();
+
   stabilization_attitude_ref_enter();
 
   FLOAT_QUAT_ZERO( stabilization_att_sum_err_quat );
   FLOAT_EULERS_ZERO( stabilization_att_sum_err_eulers );
+}
+
+void stabilization_attitude_set_failsafe_setpoint(void) {
+  /* set failsafe to zero roll/pitch and current heading */
+  float heading2 = stabilization_attitude_get_heading_f() / 2;
+  stab_att_sp_quat.qi = cosf(heading2);
+  stab_att_sp_quat.qx = 0.0;
+  stab_att_sp_quat.qy = 0.0;
+  stab_att_sp_quat.qz = sinf(heading2);
+}
+
+void stabilization_attitude_set_from_eulers_i(struct Int32Eulers *sp_euler) {
+  EULERS_FLOAT_OF_BFP(stab_att_sp_euler, *sp_euler);
+  FLOAT_QUAT_OF_EULERS(stab_att_sp_quat, stab_att_sp_euler);
+  FLOAT_QUAT_WRAP_SHORTEST(stab_att_sp_quat);
 }
 
 #ifndef GAIN_PRESCALER_FF
@@ -131,9 +158,11 @@ static void attitude_run_ff(float ff_commands[], struct FloatAttitudeGains *gain
   ff_commands[COMMAND_ROLL]          = GAIN_PRESCALER_FF * gains->dd.x * ref_accel->p;
   ff_commands[COMMAND_PITCH]         = GAIN_PRESCALER_FF * gains->dd.y * ref_accel->q;
   ff_commands[COMMAND_YAW]           = GAIN_PRESCALER_FF * gains->dd.z * ref_accel->r;
+#ifdef HAS_SURFACE_COMMANDS
   ff_commands[COMMAND_ROLL_SURFACE]  = GAIN_PRESCALER_FF * gains->surface_dd.x * ref_accel->p;
   ff_commands[COMMAND_PITCH_SURFACE] = GAIN_PRESCALER_FF * gains->surface_dd.y * ref_accel->q;
   ff_commands[COMMAND_YAW_SURFACE]   = GAIN_PRESCALER_FF * gains->surface_dd.z * ref_accel->r;
+#endif
 }
 
 #ifndef GAIN_PRESCALER_P
@@ -167,6 +196,7 @@ static void attitude_run_fb(float fb_commands[], struct FloatAttitudeGains *gain
     GAIN_PRESCALER_D * gains->rates_d.z  * rate_err_d->r +
     GAIN_PRESCALER_I * gains->i.z  * sum_err->qz;
 
+#ifdef HAS_SURFACE_COMMANDS
   fb_commands[COMMAND_ROLL_SURFACE] =
     GAIN_PRESCALER_P * gains->surface_p.x  * att_err->qx +
     GAIN_PRESCALER_D * gains->surface_d.x  * rate_err->p +
@@ -181,7 +211,7 @@ static void attitude_run_fb(float fb_commands[], struct FloatAttitudeGains *gain
     GAIN_PRESCALER_P * gains->surface_p.z  * att_err->qz +
     GAIN_PRESCALER_D * gains->surface_d.z  * rate_err->r +
     GAIN_PRESCALER_I * gains->surface_i.z  * sum_err->qz;
-
+#endif
 }
 
 void stabilization_attitude_run(bool_t enable_integrator) {
@@ -197,13 +227,19 @@ void stabilization_attitude_run(bool_t enable_integrator) {
 
   /* attitude error                          */
   struct FloatQuat att_err;
-  FLOAT_QUAT_INV_COMP(att_err, ahrs_float.ltp_to_body_quat, stab_att_ref_quat);
+  struct FloatQuat* att_quat = stateGetNedToBodyQuat_f();
+  FLOAT_QUAT_INV_COMP(att_err, *att_quat, stab_att_ref_quat);
   /* wrap it in the shortest direction       */
   FLOAT_QUAT_WRAP_SHORTEST(att_err);
 
   /*  rate error                */
   struct FloatRates rate_err;
-  RATES_DIFF(rate_err, stab_att_ref_rate, ahrs_float.body_rate);
+  struct FloatRates* body_rate = stateGetBodyRates_f();
+  RATES_DIFF(rate_err, stab_att_ref_rate, *body_rate);
+  /* rate_d error               */
+  struct FloatRates body_rate_d;
+  RATES_DIFF(body_rate_d, *body_rate, last_body_rate);
+  RATES_COPY(last_body_rate, *body_rate);
 
   /* integrated error */
   if (enable_integrator) {
@@ -225,12 +261,17 @@ void stabilization_attitude_run(bool_t enable_integrator) {
 
   attitude_run_ff(stabilization_att_ff_cmd, &stabilization_gains[gain_idx], &stab_att_ref_accel);
 
-  attitude_run_fb(stabilization_att_fb_cmd, &stabilization_gains[gain_idx], &att_err, &rate_err, &ahrs_float.body_rate_d, &stabilization_att_sum_err_quat);
+  attitude_run_fb(stabilization_att_fb_cmd, &stabilization_gains[gain_idx], &att_err, &rate_err, &body_rate_d, &stabilization_att_sum_err_quat);
 
-  // FIXME: this is very dangerous! only works if this really includes all commands
-  for (int i = COMMAND_ROLL; i <= COMMAND_YAW_SURFACE; i++) {
-    stabilization_cmd[i] = stabilization_att_fb_cmd[i]+stabilization_att_ff_cmd[i];
-  }
+  stabilization_cmd[COMMAND_ROLL] = stabilization_att_fb_cmd[COMMAND_ROLL] + stabilization_att_ff_cmd[COMMAND_ROLL];
+  stabilization_cmd[COMMAND_PITCH] = stabilization_att_fb_cmd[COMMAND_PITCH] + stabilization_att_ff_cmd[COMMAND_PITCH];
+  stabilization_cmd[COMMAND_YAW] = stabilization_att_fb_cmd[COMMAND_YAW] + stabilization_att_ff_cmd[COMMAND_YAW];
+
+#ifdef HAS_SURFACE_COMMANDS
+  stabilization_cmd[COMMAND_ROLL_SURFACE] = stabilization_att_fb_cmd[COMMAND_ROLL_SURFACE] + stabilization_att_ff_cmd[COMMAND_ROLL_SURFACE];
+  stabilization_cmd[COMMAND_PITCH_SURFACE] = stabilization_att_fb_cmd[COMMAND_PITCH_SURFACE] + stabilization_att_ff_cmd[COMMAND_PITCH_SURFACE];
+  stabilization_cmd[COMMAND_YAW_SURFACE] = stabilization_att_fb_cmd[COMMAND_YAW_SURFACE] + stabilization_att_ff_cmd[COMMAND_YAW_SURFACE];
+#endif
 
   /* bound the result */
   BoundAbs(stabilization_cmd[COMMAND_ROLL], MAX_PPRZ);
@@ -240,6 +281,6 @@ void stabilization_attitude_run(bool_t enable_integrator) {
 
 void stabilization_attitude_read_rc(bool_t in_flight) {
 
-  stabilization_attitude_read_rc_setpoint_quat_float(&stab_att_sp_quat, in_flight);
+  stabilization_attitude_read_rc_setpoint_quat_f(&stab_att_sp_quat, in_flight);
   //FLOAT_QUAT_WRAP_SHORTEST(stab_att_sp_quat);
 }

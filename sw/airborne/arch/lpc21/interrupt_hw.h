@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005  Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -21,12 +19,20 @@
  * Boston, MA 02111-1307, USA.
  *
  */
-/** \file interrupt_hw.h
- *  \brief ARM Low level interrupt handling
+
+/**
+ * @file arch/lpc21/interrupt_hw.h
+ * @ingroup lpc21_arch
  *
+ * ARM Low level interrupt handling.
  */
+
+#ifndef INTERRUPT_HW_H
+#define INTERRUPT_HW_H
 
 #include "armVIC.h"
 
 #define int_enable() enableIRQ()
 #define int_disable() disableIRQ()
+
+#endif /* INTERRUPT_HW_H */

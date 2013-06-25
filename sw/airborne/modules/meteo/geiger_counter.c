@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2011 Martin Mueller <martinmm@pfump.org>
  *
  * This file is part of paparazzi.
@@ -51,7 +49,7 @@ void geiger_counter_init( void ) {
 }
 
 void geiger_counter_periodic( void ) {
-  I2CReceive(GEIGER_CNT_DEV, geiger_trans, GEIGER_CNT_I2C_ADDR, 10);
+  i2c_receive(&GEIGER_CNT_DEV, &geiger_trans, GEIGER_CNT_I2C_ADDR, 10);
 }
 
 void geiger_counter_event( void ) {

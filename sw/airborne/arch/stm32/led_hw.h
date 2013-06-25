@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -24,13 +22,12 @@
 #ifndef LED_HW_H
 #define LED_HW_H
 
-#include <stm32/gpio.h>
-#include <stm32/rcc.h>
+#include <libopencm3/stm32/gpio.h>
+#include <libopencm3/stm32/rcc.h>
 
 #include BOARD_CONFIG
 
 #include "std.h"
-
 
 /*
  *
@@ -42,27 +39,43 @@
 #define _LED_GPIO_CLK(i)  i
 #define _LED_GPIO(i)  i
 #define _LED_GPIO_PIN(i) i
+#define _LED_GPIO_ON(i) i
+#define _LED_GPIO_OFF(i) i
 #define _LED_AFIO_REMAP(i) i
 
 #define LED_GPIO_CLK(i) _LED_GPIO_CLK(LED_ ## i ## _GPIO_CLK)
 #define LED_GPIO(i) _LED_GPIO(LED_ ## i ## _GPIO)
 #define LED_GPIO_PIN(i) _LED_GPIO_PIN(LED_ ## i ## _GPIO_PIN)
+#define LED_GPIO_ON(i) _LED_GPIO_ON(LED_ ## i ## _GPIO_ON)
+#define LED_GPIO_OFF(i) _LED_GPIO_OFF(LED_ ## i ## _GPIO_OFF)
 #define LED_AFIO_REMAP(i) _LED_AFIO_REMAP(LED_ ## i ## _AFIO_REMAP)
 
 /* set pin as output */
-#define LED_INIT(i) {					\
-    GPIO_InitTypeDef GPIO_InitStructure; 		\
-    RCC_APB2PeriphClockCmd(LED_GPIO_CLK(i), ENABLE);	\
-    GPIO_InitStructure.GPIO_Pin = LED_GPIO_PIN(i);	\
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;	\
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;	\
-    GPIO_Init(LED_GPIO(i), &GPIO_InitStructure);	\
-    LED_AFIO_REMAP(i);					\
+#if defined(STM32F1) || defined(STM32F2)
+#define LED_INIT(i) {                               \
+    rcc_peripheral_enable_clock(&RCC_APB2ENR,       \
+                                LED_GPIO_CLK(i));	  \
+    gpio_set_mode(LED_GPIO(i),                      \
+                  GPIO_MODE_OUTPUT_50_MHZ,          \
+                  GPIO_CNF_OUTPUT_PUSHPULL,         \
+                  LED_GPIO_PIN(i));                 \
+    LED_AFIO_REMAP(i);                              \
   }
+#elif defined(STM32F4)
+#define LED_INIT(i) {                             \
+    rcc_peripheral_enable_clock(&RCC_AHB1ENR,     \
+                                LED_GPIO_CLK(i));	\
+    gpio_mode_setup(LED_GPIO(i),                  \
+                  GPIO_MODE_OUTPUT,			          \
+                  GPIO_PUPD_NONE,                 \
+                  LED_GPIO_PIN(i));               \
+    LED_AFIO_REMAP(i);                            \
+  }
+#endif
 
-#define LED_ON(i) {LED_GPIO(i)->BRR = LED_GPIO_PIN(i);}
-#define LED_OFF(i) { LED_GPIO(i)->BSRR  = LED_GPIO_PIN(i);}
-#define LED_TOGGLE(i) {	LED_GPIO(i)->ODR ^= LED_GPIO_PIN(i);}
+#define LED_ON(i) LED_GPIO_ON(i)(LED_GPIO(i), LED_GPIO_PIN(i))
+#define LED_OFF(i) LED_GPIO_OFF(i)(LED_GPIO(i), LED_GPIO_PIN(i))
+#define LED_TOGGLE(i) gpio_toggle(LED_GPIO(i), LED_GPIO_PIN(i))
 
 #define LED_PERIODIC() {}
 
@@ -79,33 +92,35 @@ extern uint8_t led_status[NB_LED];
 /* PA8  led_clk  */
 /* PC15 led_data */
 
-#define LED_INIT(_i) {						\
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);	\
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);	\
-    GPIO_InitTypeDef GPIO_InitStructure;			\
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;			\
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;		\
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;		\
-    GPIO_Init(GPIOA, &GPIO_InitStructure);			\
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;			\
-    GPIO_Init(GPIOC, &GPIO_InitStructure);			\
-    for(uint8_t i=0; i<NB_LED; i++)				\
-      led_status[i] = FALSE;					\
+#define LED_INIT(_i) {                                  \
+    rcc_peripheral_enable_clock(&RCC_APB2ENR,           \
+                                RCC_APB2ENR_IOPAEN |    \
+                                RCC_APB2ENR_IOPCEN);    \
+    gpio_set_mode(GPIOA,                                \
+                  GPIO_MODE_OUTPUT_50_MHZ,              \
+                  GPIO_CNF_OUTPUT_PUSHPULL,             \
+                  GPIO8);                               \
+    gpio_set_mode(GPIOC,                                \
+                  GPIO_MODE_OUTPUT_50_MHZ,              \
+                  GPIO_CNF_OUTPUT_PUSHPULL,             \
+                  GPIO15);                              \
+    for(uint8_t _cnt=0; _cnt<NB_LED; _cnt++)            \
+      led_status[_cnt] = FALSE;                         \
   }
 
 #define LED_ON(i)  { led_status[i] = TRUE;  }
 #define LED_OFF(i) { led_status[i] = FALSE; }
 #define LED_TOGGLE(i) {led_status[i] = !led_status[i];}
 
-#define LED_PERIODIC() {					\
-    for (uint8_t cnt = 0; cnt < NB_LED; cnt++) {		\
-      if (led_status[cnt])					\
-	GPIOC->BSRR = GPIO_Pin_15;				\
-      else							\
-	GPIOC->BRR = GPIO_Pin_15;				\
-      GPIOA->BSRR = GPIO_Pin_8; /* clock rising edge */		\
-      GPIOA->BRR = GPIO_Pin_8;  /* clock falling edge */	\
-    }								\
+#define LED_PERIODIC() {                                    \
+    for (uint8_t _cnt = 0; _cnt < NB_LED; _cnt++) {         \
+      if (led_status[_cnt])                                 \
+        gpio_set(GPIOC, GPIO15);                            \
+      else                                                  \
+        gpio_clear(GPIOC, GPIO15);                          \
+      gpio_set(GPIOA, GPIO8); /* clock rising edge */       \
+      gpio_clear(GPIOA, GPIO8);  /* clock falling edge */   \
+    }                                                       \
   }
 
 #endif /* LED_STP08 */

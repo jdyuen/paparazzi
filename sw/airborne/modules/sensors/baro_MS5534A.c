@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2007  ENAC
  *
  * This file is part of paparazzi.
@@ -22,8 +20,9 @@
  *
  */
 
-/** \file baro_MS5534A.c
- *  \brief Handling of the MS5534a pressure sensor
+/**
+ * @file modules/sensors/baro_MS5534A.c
+ * @brief Handling of the MS5534a pressure sensor
  *
  * uses: MOSI, MISO, SCK and 32kHz @ P0.7 with 5V for the -A type
  */
@@ -35,7 +34,7 @@
 #include "ap_downlink.h"
 #endif
 #include "subsystems/nav.h"
-#include "estimator.h"
+#include "state.h"
 
 bool_t baro_MS5534A_do_reset;
 uint32_t baro_MS5534A_pressure;
@@ -258,11 +257,11 @@ void baro_MS5534A_event( void ) {
     spi_message_received = FALSE;
     baro_MS5534A_event_task();
     if (baro_MS5534A_available) {
-      baro_MS5534A_available = FALSE;
+    //  baro_MS5534A_available = FALSE; // Checked by INS
       baro_MS5534A_z = ground_alt +((float)baro_MS5534A_ground_pressure - baro_MS5534A_pressure)*0.084;
-      if (alt_baro_enabled) {
-        EstimatorSetAlt(baro_MS5534A_z);
-      }
+    //  if (alt_baro_enabled) {
+    //    EstimatorSetAlt(baro_MS5534A_z); // Updated by INS
+    //  }
     }
   }
 }

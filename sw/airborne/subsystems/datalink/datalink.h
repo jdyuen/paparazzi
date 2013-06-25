@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2005  Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -47,6 +45,7 @@
 /** Datalink kinds */
 #define PPRZ 1
 #define XBEE 2
+#define UDP 3
 
 EXTERN bool_t dl_msg_available;
 /** Flag provided to control calls to ::dl_parse_msg. NOT used in this module*/
@@ -61,25 +60,40 @@ EXTERN void dl_parse_msg(void);
 
 /** Check for new message and parse */
 #define DlCheckAndParse() {   \
-  if (dl_msg_available) {			\
-    dl_parse_msg();				    \
-    dl_msg_available = FALSE;	\
-  }						                \
+  if (dl_msg_available) {      \
+    dl_parse_msg();            \
+    dl_msg_available = FALSE;  \
+  }                            \
 }
 
-#if DATALINK == PPRZ
+#if defined DATALINK && DATALINK == PPRZ
 
-#define DatalinkEvent() {			            \
-  PprzCheckAndParse(PPRZ_UART, pprz_tp);  \
-  DlCheckAndParse();                      \
-}
+#define DatalinkEvent() {                       \
+    PprzCheckAndParse(PPRZ_UART, pprz_tp);      \
+    DlCheckAndParse();                          \
+  }
 
-#elif DATALINK == XBEE
+#elif defined DATALINK && DATALINK == XBEE
 
-#define DatalinkEvent() {			            \
-  XBeeCheckAndParse(XBEE_UART, xbee_tp);  \
-  DlCheckAndParse();                      \
-}
+#define DatalinkEvent() {                       \
+    XBeeCheckAndParse(XBEE_UART, xbee_tp);      \
+    DlCheckAndParse();                          \
+  }
+
+#elif defined DATALINK && DATALINK == W5100
+
+#define DatalinkEvent() {                       \
+    W5100CheckAndParse(W5100, w5100_tp);        \
+    DlCheckAndParse();                          \
+  }
+
+#elif defined DATALINK && DATALINK == UDP
+
+#define DatalinkEvent() {                       \
+    UdpCheckAndParse();                        \
+    DlCheckAndParse();                          \
+  }
+
 
 #else
 

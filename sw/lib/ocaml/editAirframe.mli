@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Handling of an XML airframe file
  *
  * Copyright (C) 2008, Cyril Allignol, Pascal Brisset
@@ -25,7 +23,7 @@
  *)
 
 type units = string option
-type data = string * units
+type data = string * units * units
 
 val get : Nethtml.document -> string -> data
 (** [get xml param] Returns the associated value in a [define] element *)

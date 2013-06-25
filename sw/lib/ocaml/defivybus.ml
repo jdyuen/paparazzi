@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Default ivy bus address selection
  *
  * Copyright (C) 2011 Eric Parsonage
@@ -25,8 +23,8 @@
  *)
 let default_ivy_bus = String.copy (
   try (Sys.getenv "IVY_BUS" )
-    with  Not_found ->
-     (if Os_calls.contains (Os_calls.os_name) "Darwin" then
+  with  Not_found ->
+    (if Os_calls.contains (Os_calls.os_name) "Darwin" then
         "224.255.255.255:2010"
-      else
+     else
         "127.255.255.255:2010"))

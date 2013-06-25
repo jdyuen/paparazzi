@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2006  Pascal Brisset, Antoine Drouin, Michel Gorraz
  *
  * This file is part of paparazzi.
@@ -19,12 +17,12 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
- *
  */
 
 /**
+ * @file firmwares/fixedwing/stabilization/stabilization_attitude.h
  *
- * fixed wing horizontal control
+ * Fixed wing horizontal control.
  *
  */
 
@@ -90,7 +88,7 @@ extern float h_ctl_lo_throttle_roll_rate_pgain;
 extern float h_ctl_roll_rate_igain;
 extern float h_ctl_roll_rate_dgain;
 
-#define fw_h_ctl_SetRollRatePGain(v) { h_ctl_hi_throttle_roll_rate_pgain = v; h_ctl_lo_throttle_roll_rate_pgain = v; }
+#define stabilization_attitude_SetRollRatePGain(v) { h_ctl_hi_throttle_roll_rate_pgain = v; h_ctl_lo_throttle_roll_rate_pgain = v; }
 #endif
 
 extern void h_ctl_init( void );

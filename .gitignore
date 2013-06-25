@@ -1,5 +1,6 @@
 # ignore html dir for github pages
-/doc/html
+/doc/generated
+/doc/manual/generated
 
 *.so
 *.[oa]
@@ -24,26 +25,12 @@
 *.cproject
 *.project
 *.externalToolBuilders
+.settings
+.pydevproject
+.metadata
 /build.properties
 /META-INF
 
-# Debian related files
-*.deb
-*.dsc
-*.changes
-*.substvars
-*.debhelper.log
-*-stamp
-/debian/control
-/debian/changelog
-/debian/files
-/debian/paparazzi-arm7
-/debian/paparazzi-avr
-/debian/paparazzi-dev
-/debian/paparazzi-bin
-/sw/lib/ocaml/ivy/debian/changelog
-/sw/lib/ocaml/ivy/debian/files
-/sw/lib/ocaml/ivy/debian/ivy-ocaml
 
 /var
 /dox
@@ -67,8 +54,10 @@
 /sw/ground_segment/cockpit/gtk_save_settings.ml
 /sw/ground_segment/cockpit/gtk_setting_time.ml
 /sw/ground_segment/cockpit/gcs
+/sw/ground_segment/cockpit/gcs.opt
 /sw/ground_segment/cockpit/gtk_strip.ml
 /sw/ground_segment/cockpit/ant_track
+/sw/ground_segment/cockpit/compass
 
 
 # /sw/ground_segment/lpc21iap/
@@ -92,6 +81,7 @@
 /sw/ground_segment/tmtc/dia
 /sw/ground_segment/tmtc/ivy2udp
 /sw/ground_segment/tmtc/server
+/sw/ground_segment/tmtc/server.opt
 /sw/ground_segment/tmtc/diadec
 /sw/ground_segment/tmtc/ivy_serial_bridge
 /sw/ground_segment/tmtc/GSM/SMS_GS
@@ -113,6 +103,7 @@
 /sw/lib/ocaml/expr_parser.mli
 /sw/lib/ocaml/gtk_papget_led_editor.ml
 /sw/lib/ocaml/expr_lexer.ml
+/sw/lib/ocaml/META.pprz
 
 # /sw/logalizer/
 /sw/logalizer/plot
@@ -133,7 +124,6 @@
 # /sw/simulator/
 /sw/simulator/gaia
 /sw/simulator/simhitl
-/sw/simulator/launchsitl
 
 # /sw/supervision/
 /sw/supervision/gtk_process.ml
@@ -143,6 +133,7 @@
 # /sw/tools/
 /sw/tools/fp_parser.ml
 /sw/tools/wiki_gen/wiki_gen
+/sw/tools/mergelogs
 
 # /sw/ground_segment/misc
 /sw/ground_segment/misc/davis2ivy

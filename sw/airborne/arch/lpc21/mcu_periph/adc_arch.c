@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008  Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -20,6 +18,13 @@
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
+ */
+
+/**
+ * @file arch/lpc21/mcu_periph/adc_arch.c
+ * @ingroup lpc21_arch
+ *
+ * Handling of ADC hardware for lpc21xx.
  */
 
 #include "mcu_periph/adc.h"

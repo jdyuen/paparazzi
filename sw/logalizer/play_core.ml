@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Log player
  *
  * Copyright (C) 2004 CENA/ENAC, Pascal Brisset, Antoine Drouin
@@ -61,13 +59,21 @@ let store_conf = fun conf acs ->
 	    f in
 	  ignore (w "airframe");
 	  ignore (w "radio");
-	  let fp = w "flight_plan" in
-	  (** We must "dump" the flight plan from the original one *)
-	  ignore (Sys.command (sprintf "mkdir -p %s" ac_dir));
-	  let dump = ac_dir // "flight_plan.xml" in
-	  let c = sprintf "%s %s > %s" dump_fp fp dump in
-	  if Sys.command c <> 0 then
-	    failwith c;
+          (* test if flight plan is an original one or the dumped version *)
+          let orig_fp = List.exists (fun e -> compare (Xml.tag e) "flight_plan" = 0) (Xml.children x) in
+          if orig_fp then begin
+	    let fp = w "flight_plan" in
+	    (** We must "dump" the flight plan from the original one *)
+	    ignore (Sys.command (sprintf "mkdir -p %s" ac_dir));
+	    let dump = ac_dir // "flight_plan.xml" in
+	    let c = sprintf "%s %s > %s" dump_fp fp dump in
+	    if Sys.command c <> 0 then
+	      failwith c;
+          end
+          else begin
+            let f = ac_dir // "flight_plan.xml" in
+            write_xml f (ExtXml.child x "dump");
+          end;
 	  Xml.Element ("aircraft", Xml.attribs x, [])::r
 	else r
       else (** Keep ground section *)
@@ -122,6 +128,7 @@ let was_running = ref false
 let bus = ref Defivybus.default_ivy_bus
 let port = ref "/dev/ttyUSB0"
 let baudrate = ref "9600"
+let hw_flow_control = ref false
 let file_to_load = ref ""
 let output_on_serial = ref false
 
@@ -177,7 +184,8 @@ let init = fun () ->
     [ "-b", Arg.String (fun x -> bus := x), (sprintf "<ivy bus> Default is %s" !bus);
       "-d", Arg.Set_string port, (sprintf "<port> Default is %s" !port);
       "-o", Arg.Set output_on_serial, "Output binary messages on serial port";
-      "-s", Arg.Set_string baudrate, (sprintf "<baudrate>  Default is %s" !baudrate)]
+      "-s", Arg.Set_string baudrate, (sprintf "<baudrate>  Default is %s" !baudrate);
+      "-shfc",  Arg.Set hw_flow_control, "Enable UART hardware flow control (CTS/RTS)";]
     (fun x -> file_to_load := x)
     "Usage: ";
 
@@ -187,7 +195,7 @@ let init = fun () ->
 
   let serial_port =
     if !output_on_serial then
-      Some (Unix.out_channel_of_descr (Serial.opendev !port (Serial.speed_of_baudrate !baudrate)))
+      Some (Unix.out_channel_of_descr (Serial.opendev !port (Serial.speed_of_baudrate !baudrate) !hw_flow_control))
     else
       None in
 

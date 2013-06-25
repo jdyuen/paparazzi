@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
+ *
+ * This file is part of paparazzi.
+ *
+ * paparazzi is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * paparazzi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
 #include "nps_autopilot_rotorcraft.h"
 
 #include "firmwares/rotorcraft/main.h"
@@ -9,19 +30,23 @@
 #include "baro_board.h"
 #include "subsystems/electrical.h"
 #include "mcu_periph/sys_time.h"
+#include "state.h"
 
-#include "actuators/supervision.h"
+#include "subsystems/actuators/motor_mixing.h"
 
 
 struct NpsAutopilot autopilot;
 bool_t nps_bypass_ahrs;
 
+#ifndef NPS_BYPASS_AHRS
+#define NPS_BYPASS_AHRS FALSE
+#endif
+
 
 void nps_autopilot_init(enum NpsRadioControlType type_rc, int num_rc_script, char* rc_dev) {
 
   nps_radio_control_init(type_rc, num_rc_script, rc_dev);
-  nps_bypass_ahrs = TRUE;
-  //  nps_bypass_ahrs = FALSE;
+  nps_bypass_ahrs = NPS_BYPASS_AHRS;
 
   main_init();
 
@@ -73,16 +98,10 @@ void nps_autopilot_run_step(double time __attribute__ ((unused))) {
 
   handle_periodic_tasks();
 
-  if (time < 8) { /* start with a little bit of hovering */
-    int32_t init_cmd[4];
-    init_cmd[COMMAND_THRUST] = 0.253*SUPERVISION_MAX_MOTOR;
-    init_cmd[COMMAND_ROLL]   = 0;
-    init_cmd[COMMAND_PITCH]  = 0;
-    init_cmd[COMMAND_YAW]    = 0;
-    supervision_run(TRUE, FALSE, init_cmd);
-  }
-  for (uint8_t i=0; i<ACTUATORS_MKK_NB; i++)
-    autopilot.commands[i] = (double)supervision.commands[i] / SUPERVISION_MAX_MOTOR;
+  /* scale final motor commands to 0-1 for feeding the fdm */
+  /* FIXME: autopilot.commands is of length NB_COMMANDS instead of number of motors */
+  for (uint8_t i=0; i<MOTOR_MIXING_NB_MOTOR; i++)
+    autopilot.commands[i] = (double)motor_mixing.commands[i]/MAX_PPRZ;
 
 }
 
@@ -91,12 +110,12 @@ void nps_autopilot_run_step(double time __attribute__ ((unused))) {
 #include "math/pprz_algebra.h"
 void sim_overwrite_ahrs(void) {
 
-  EULERS_BFP_OF_REAL(ahrs.ltp_to_body_euler, fdm.ltp_to_body_eulers);
+  struct Int32Quat quat;
+  QUAT_BFP_OF_REAL(quat, fdm.ltp_to_body_quat);
+  stateSetNedToBodyQuat_i(&quat);
 
-  QUAT_BFP_OF_REAL(ahrs.ltp_to_body_quat, fdm.ltp_to_body_quat);
-
-  RATES_BFP_OF_REAL(ahrs.body_rate, fdm.body_ecef_rotvel);
-
-  INT32_RMAT_OF_QUAT(ahrs.ltp_to_body_rmat, ahrs.ltp_to_body_quat);
+  struct Int32Rates rates;
+  RATES_BFP_OF_REAL(rates, fdm.body_ecef_rotvel);
+  stateSetBodyRates_i(&rates);
 
 }

@@ -1,6 +1,4 @@
 /*
- * $Id:$
- *
  * Copyright (C) 2010 Piotr Esden-Tempski <piotr@esden.net>
  *
  * This file is part of paparazzi.
@@ -20,6 +18,13 @@
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
+ */
+
+/**
+ * @file arch/stm32/mcu_periph/can_arch.h
+ * @ingroup stm32_arch
+ *
+ * Handling of CAN hardware for STM32.
  */
 
 #ifndef MCU_PERIPH_STM32_CAN_ARCH_H

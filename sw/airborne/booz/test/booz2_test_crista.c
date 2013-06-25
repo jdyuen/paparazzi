@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -78,7 +76,7 @@ static inline void main_periodic_task( void ) {
   //  uint16_t foo = ami601_status;
   //  DOWNLINK_SEND_BOOT(&foo);
   //#endif
-  //  if (cpu_time_sec > 2)
+  //  if (sys_time.nb_sec > 2)
 
   imu_periodic();
 }

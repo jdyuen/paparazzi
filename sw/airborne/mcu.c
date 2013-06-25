@@ -1,7 +1,5 @@
 /*
- * Paparazzi microcontroller initialisation function
- *
- * Copyright (C) 2010 The Paparazzi team
+ * Copyright (C) 2010-2012 The Paparazzi team
  *
  * This file is part of Paparazzi.
  *
@@ -22,7 +20,13 @@
  *
  */
 
+/**
+ * @file mcu.c
+ * @brief Arch independent mcu ( Micro Controller Unit ) utilities.
+ */
+
 #include "mcu.h"
+#include "std.h"
 
 #ifdef PERIPHERALS_AUTO_INIT
 #include "mcu_periph/sys_time.h"
@@ -34,7 +38,7 @@
 #include "subsystems/radio_control.h"
 #endif
 #endif
-#if defined USE_UART0 || defined USE_UART1  || defined USE_UART2 || defined USE_UART3 || defined USE_UART4  || defined USE_UART5
+#if defined USE_UART0 || defined USE_UART1 || defined USE_UART2 || defined USE_UART3 || defined USE_UART4 || defined USE_UART5 || defined USE_UART6
 #include "mcu_periph/uart.h"
 #endif
 #if defined USE_I2C0  || defined USE_I2C1  || defined USE_I2C2
@@ -46,7 +50,7 @@
 #ifdef USE_USB_SERIAL
 #include "mcu_periph/usb_serial.h"
 #endif
-#ifdef USE_SPI
+#if USE_SPI
 #include "mcu_periph/spi.h"
 #endif
 #ifdef USE_DAC
@@ -85,6 +89,9 @@ void mcu_init(void) {
 #ifdef USE_UART5
   uart5_init();
 #endif
+#ifdef USE_UART6
+  uart6_init();
+#endif
 #ifdef USE_I2C0
   i2c0_init();
 #endif
@@ -100,12 +107,46 @@ void mcu_init(void) {
 #ifdef USE_USB_SERIAL
   VCOM_init();
 #endif
-#ifdef USE_SPI
-  spi_init();
+
+#if USE_SPI
+#if SPI_MASTER
+
+#if USE_SPI0
+  spi0_init();
 #endif
+#if USE_SPI1
+  spi1_init();
+#endif
+#if USE_SPI2
+  spi2_init();
+#endif
+#if USE_SPI3
+  spi3_init();
+#endif
+  spi_init_slaves();
+#endif // SPI_MASTER
+
+#if SPI_SLAVE
+#if USE_SPI0_SLAVE
+  spi0_slave_init();
+#endif
+#if USE_SPI1_SLAVE
+  spi1_slave_init();
+#endif
+#if USE_SPI2_SLAVE
+  spi2_slave_init();
+#endif
+#if USE_SPI3_SLAVE
+  spi3_slave_init();
+#endif
+#endif // SPI_SLAVE
+#endif // USE_SPI
+
 #ifdef USE_DAC
   dac_init();
 #endif
+#else
+INFO("PERIPHERALS_AUTO_INIT not enabled! Peripherals (including sys_time) need explicit initialization.")
 #endif /* PERIPHERALS_AUTO_INIT */
 
 }

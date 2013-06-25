@@ -1,6 +1,4 @@
 /*
- * $Id:  $
- *
  * Copyright (C) 2009 Felix Ruess <felix.ruess@gmail.com>
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
@@ -20,6 +18,13 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
+ */
+
+/**
+ * @file subsystems/ahrs/ahrs_float_lkf.h
+ *
+ * Linearized Kalman Filter for attitude estimation.
+ *
  */
 
 #ifndef AHRS_FLOAT_LKF_H

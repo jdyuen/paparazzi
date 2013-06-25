@@ -19,20 +19,18 @@
  * Boston, MA 02111-1307, USA.
  */
 
-/** @file stabilization_attitude_ref_int.c
- * Rotorcraft attitude reference generation (quaternion int version)
+/**
+ * @file firmwares/rotorcraft/stabilization/stabilization_attitude_ref_quat_int.c
+ *
+ * Rotorcraft attitude reference generation.
+ * (quaternion int version)
  *
  */
 
 #include "generated/airframe.h"
 #include "firmwares/rotorcraft/stabilization.h"
-#include "subsystems/ahrs.h"
 
 #include "stabilization_attitude_ref_int.h"
-
-#if USE_SETPOINTS_WITH_TRANSITIONS
-#include "firmwares/rotorcraft/stabilization/quat_setpoint_int.h"
-#endif
 
 #define REF_ACCEL_MAX_P BFP_OF_REAL(STABILIZATION_ATTITUDE_REF_MAX_PDOT, REF_ACCEL_FRAC)
 #define REF_ACCEL_MAX_Q BFP_OF_REAL(STABILIZATION_ATTITUDE_REF_MAX_QDOT, REF_ACCEL_FRAC)
@@ -76,6 +74,12 @@ struct Int32RefModel stab_att_ref_model = {
   {STABILIZATION_ATTITUDE_REF_ZETA_P, STABILIZATION_ATTITUDE_REF_ZETA_Q, STABILIZATION_ATTITUDE_REF_ZETA_R}
 };
 
+static inline void reset_psi_ref_from_body(void) {
+  //sp has been set from body using stabilization_attitude_get_yaw_i, use that value
+  stab_att_ref_euler.psi = stab_att_sp_euler.psi << (REF_ANGLE_FRAC - INT32_ANGLE_FRAC);
+  stab_att_ref_rate.r = 0;
+  stab_att_ref_accel.r = 0;
+}
 
 void stabilization_attitude_ref_init(void) {
 
@@ -95,20 +99,15 @@ void stabilization_attitude_ref_init(void) {
 
 }
 
-void stabilization_attitude_ref_enter()
+void stabilization_attitude_ref_enter(void)
 {
   reset_psi_ref_from_body();
 
-#if USE_SETPOINTS_WITH_TRANSITIONS
-  stabilization_attitude_sp_enter();
-  memcpy(&stab_att_ref_quat, &stab_att_sp_quat, sizeof(struct Int32Quat));
-#else
   /* convert reference attitude with REF_ANGLE_FRAC to eulers with normal INT32_ANGLE_FRAC */
   struct Int32Eulers ref_eul;
   INT32_EULERS_RSHIFT(ref_eul, stab_att_ref_euler, (REF_ANGLE_FRAC - INT32_ANGLE_FRAC));
   INT32_QUAT_OF_EULERS(stab_att_ref_quat, ref_eul);
   INT32_QUAT_WRAP_SHORTEST(stab_att_ref_quat);
-#endif
 
   /* set reference rate and acceleration to zero */
   memset(&stab_att_ref_accel, 0, sizeof(struct Int32Rates));
@@ -119,27 +118,32 @@ void stabilization_attitude_ref_enter()
  * Reference
  */
 #define DT_UPDATE (1./PERIODIC_FREQUENCY)
+// CAUTION! Periodic frequency is assumed to be 512 Hz
+// which is equal to >> 9
 #define F_UPDATE_RES 9
 
-void stabilization_attitude_ref_update() {
+void stabilization_attitude_ref_update(void) {
 
   /* integrate reference attitude            */
   struct Int32Quat qdot;
   INT32_QUAT_DERIVATIVE(qdot, stab_att_ref_rate, stab_att_ref_quat);
-  //QUAT_SMUL(qdot, qdot, RATE_BFP_OF_REAL(DT_UPDATE));
-  QUAT_SMUL(qdot, qdot, 4);
-  QUAT_SMUL(qdot, qdot, DT_UPDATE);
+  //QUAT_SMUL(qdot, qdot, DT_UPDATE);
+  qdot.qi = qdot.qi >> F_UPDATE_RES;
+  qdot.qx = qdot.qx >> F_UPDATE_RES;
+  qdot.qy = qdot.qy >> F_UPDATE_RES;
+  qdot.qz = qdot.qz >> F_UPDATE_RES;
   QUAT_ADD(stab_att_ref_quat, qdot);
   INT32_QUAT_NORMALIZE(stab_att_ref_quat);
 
-  /* integrate reference rotational speeds   */
+  /* integrate reference rotational speeds
+   * delta rate = ref_accel * dt
+   * ref_rate = old_ref_rate + delta_rate
+   */
   const struct Int32Rates delta_rate = {
          stab_att_ref_accel.p >> ( F_UPDATE_RES + REF_ACCEL_FRAC - REF_RATE_FRAC),
          stab_att_ref_accel.q >> ( F_UPDATE_RES + REF_ACCEL_FRAC - REF_RATE_FRAC),
          stab_att_ref_accel.r >> ( F_UPDATE_RES + REF_ACCEL_FRAC - REF_RATE_FRAC)};
 
-  //RATES_SMUL(delta_rate, stab_att_ref_accel, RATE_BFP_OF_REAL(DT_UPDATE));
-  //RATES_SMUL(delta_rate, stab_att_ref_accel, DT_UPDATE);
   RATES_ADD(stab_att_ref_rate, delta_rate);
 
   /* compute reference angular accelerations */
@@ -162,15 +166,6 @@ void stabilization_attitude_ref_update() {
 
   RATES_SUM(stab_att_ref_accel, accel_rate, accel_angle);
 
-
-        /*
-  stab_att_ref_accel.p = -2.*stab_att_ref_model.zeta.p*stab_att_ref_model.omega.p*stab_att_ref_rate.p
-    - stab_att_ref_model.omega.p*stab_att_ref_model.omega.p*err.qx;
-  stab_att_ref_accel.q = -2.*stab_att_ref_model.zeta.q*stab_att_ref_model.omega.q*stab_att_ref_rate.q
-    - stab_att_ref_model.omega.q*stab_att_ref_model.omega.q*err.qy;
-  stab_att_ref_accel.r = -2.*stab_att_ref_model.zeta.r*stab_att_ref_model.omega.r*stab_att_ref_rate.r
-    - stab_att_ref_model.omega.r*stab_att_ref_model.omega.r*err.qz;
-    */
 
   /*	saturate acceleration */
   //const struct Int32Rates MIN_ACCEL = { -REF_ACCEL_MAX_P, -REF_ACCEL_MAX_Q, -REF_ACCEL_MAX_R };

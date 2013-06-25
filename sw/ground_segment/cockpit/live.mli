@@ -1,6 +1,4 @@
 (*
-* $Id$
-*
 * Real time handling of flying A/Cs
 *
 * Copyright (C) 2004-2006 ENAC, Pascal Brisset, Antoine Drouin
@@ -28,6 +26,7 @@
 type color = string
 type aircraft = private {
     ac_name : string;
+    ac_speech_name : string;
     config : Pprz.values;
     track : MapTrack.track;
     color: color;
@@ -41,6 +40,7 @@ type aircraft = private {
     ir_page : Pages.infrared;
     gps_page : Pages.gps;
     pfd_page : Horizon.pfd;
+    link_page : Pages.link;
     misc_page : Pages.misc;
     dl_settings_page : Page_settings.settings option;
     rc_settings_page : Pages.rc_settings option;

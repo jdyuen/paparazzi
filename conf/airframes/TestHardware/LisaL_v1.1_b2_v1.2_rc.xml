@@ -8,23 +8,6 @@
  GPS connected to UART1 (Since this is inside in a metal box it won't ever get a solution)
  -->
 <airframe name="TestConfig">
-<!--
-    <firmware name="rotorcraft">
-        <target name="sim"          board="pc"/>
-        <target name="ap"           board="lisa_l_1.1"/>
-
-        <subsystem name="radio_control"	type="ppm"/>
-        <subsystem name="telemetry"		type="xbee_api">
-            <configure name="MODEM_BAUD"	value="B38400"/>
-        </subsystem>
-        <subsystem name="control"/>
-        <subsystem name="gps"			type="ublox"/>
-        <subsystem name="imu"			type="b2_v1.2"/>
-        <subsystem name="stabilization"	type="euler"/>
-        <subsystem name="ahrs"			type="int_cmpl_quat"/>
-        <subsystem name="navigation"/>
-    </firmware>
--->
 
     <firmware name="rotorcraft">
         <target name="ap" board="lisa_l_1.1">
@@ -32,67 +15,53 @@
             <subsystem name="radio_control" type="spektrum"/>
             <define name="RADIO_MODE" value="RADIO_AUX1"/>
             <define name="RADIO_KILL_SWITCH" value="RADIO_GEAR"/>
-            <define name ="RADIO_CONTROL_SPEKTRUM_SECONDARY_PORT" value = "UART5"/>
-            <define name ="OVERRIDE_UART5_IRQ_HANDLER"/>
-            <subsystem name="actuators"     type="mkk"/>
-            <subsystem name="telemetry"     type="transparent"/>
+            <configure name="USE_SECONDARY_SPEKTRUM_RECEIVER" value="1"/>
         </target>
 
-        <target name="sim" board="pc">
-            <subsystem name="fdm"           type="nps"/>
+        <target name="nps" board="pc">
+            <subsystem name="fdm"           type="jsbsim"/>
             <subsystem name="radio_control" type="ppm"/>
-            <subsystem name="actuators"     type="mkk"/>
         </target>
 
+        <subsystem name="motor_mixing"/>
+        <subsystem name="actuators"     type="mkk"/>
+        <subsystem name="telemetry"     type="transparent"/>
         <subsystem name="imu"           type="b2_v1.2"/>
         <subsystem name="gps"           type="ublox">
             <configure name="GPS_BAUD"    value="B57600"/>
         </subsystem>
         <subsystem name="stabilization"   type="euler"/>
         <subsystem name="ahrs"            type="int_cmpl_quat"/>
+        <subsystem name="ins"/>
+        <define name="PRINT_CONFIG"/>
     </firmware>
 
-<!--
     <firmware name="lisa_test_progs">
-        <target name="test_led"         board="lisa_l_1.1"/>
-        <target name="test_uart"        board="lisa_l_1.1"/>
-        <target name="test_servos"      board="lisa_l_1.1"/>
-        <target name="test_telemetry"   board="lisa_l_1.1"/>
-        <target name="test_baro"        board="lisa_l_1.1"/>
-        <target name="test_imu_b2"      board="lisa_l_1.1"/>
-        <target name="test_imu_b2_2"    board="lisa_l_1.1"/>
-        <target name="test_imu_aspirin" board="lisa_l_1.1"/>
-        <target name="test_rc_spektrum" board="lisa_l_1.1"/>
-        <target name="test_rc_ppm"      board="lisa_l_1.1"/>
-        <target name="test_adc"         board="lisa_l_1.1"/>
-        <target name="test_hmc5843"     board="lisa_l_1.1"/>
-        <target name="test_itg3200"     board="lisa_l_1.1"/>
-        <target name="test_adxl345"             board="lisa_l_1.1"/>
-        <target name="test_esc_mkk_simple"      board="lisa_l_1.1"/>
-        <target name="test_esc_asctecv1_simple" board="lisa_l_1.1"/>
-        <target name="test_actuators_mkk"       board="lisa_l_1.1"/>
-        <target name="test_actuators_asctecv1"  board="lisa_l_1.1"/>
+        <define name="PRINT_CONFIG"/>
+        <target name="test_led"           board="lisa_l_1.1"/>
+        <target name="test_uart"          board="lisa_l_1.1"/>
+        <target name="test_servos"        board="lisa_l_1.1"/>
+        <target name="test_telemetry"     board="lisa_l_1.1"/>
+        <target name="test_baro"          board="lisa_l_1.1"/>
+        <target name="test_imu_b2_nomag"  board="lisa_l_1.1"/>
+        <target name="test_imu_b2"        board="lisa_l_1.1"/>
+        <target name="test_imu_b2_2"      board="lisa_l_1.1"/>
+        <target name="test_ms2100"        board="lisa_l_1.1"/>
+        <target name="test_rc_spektrum"   board="lisa_l_1.1"/>
+        <target name="test_rc_ppm"        board="lisa_l_1.1"/>
+        <target name="test_adc"           board="lisa_l_1.1"/>
     </firmware>
 
-    <firmware name="lisa_passthrough">
-        <target name="overo_test_passthrough" board="lisa_l_1.1"  >
-            <configure name="HOST"          value="A7"/>
-            <configure name="USER"          value=""/>
-            <configure name="TARGET_DIR"    value="~"/>
-            <configure name="PERIODIC_FREQ" value="512"/>
-        </target>
-        <target name="stm_passthrough" board="lisa_l_1.1">
-            <subsystem name="radio_control" type="spektrum"/>
-            <subsystem name="imu" type="b2_v1.2"/>
-        </target>
-    </firmware>
--->
+    <section name="ACTUATORS_MKK" prefix="ACTUATORS_MKK_">
+        <define name="NB" value="4"/>
+        <define name="ADDR" value="{ 0x52, 0x54, 0x56, 0x58 }"/>
+    </section>
 
-    <servos>
-        <servo name="FRONT"   no="0" min="0" neutral="0" max="255"/>
-        <servo name="BACK"    no="1" min="0" neutral="0" max="255"/>
-        <servo name="RIGHT"   no="2" min="0" neutral="0" max="255"/>
-        <servo name="LEFT"    no="3" min="0" neutral="0" max="255"/>
+    <servos driver="Mkk">
+        <servo name="FRONT"   no="0" min="0" neutral="2" max="210"/>
+        <servo name="BACK"    no="1" min="0" neutral="2" max="210"/>
+        <servo name="RIGHT"   no="2" min="0" neutral="2" max="210"/>
+        <servo name="LEFT"    no="3" min="0" neutral="2" max="210"/>
     </servos>
 
     <commands>
@@ -102,19 +71,10 @@
         <axis name="THRUST" failsafe_value="0"/>
     </commands>
 
-    <!-- for the sim -->
-    <section name="ACTUATORS_MKK" prefix="ACTUATORS_MKK_">
-        <define name="NB" value="4"/>
-        <define name="ADDR" value="{ 0x52, 0x54, 0x56, 0x58 }"/>
-    </section>
-
-
-    <section name="SUPERVISION" prefix="SUPERVISION_">
-        <define name="MIN_MOTOR" value="2"/>
-        <define name="MAX_MOTOR" value="210"/>
-        <define name="TRIM_A" value="0"/>
-        <define name="TRIM_E" value="0"/>
-        <define name="TRIM_R" value="0"/>
+    <section name="MIXING" prefix="MOTOR_MIXING_">
+        <define name="TRIM_ROLL" value="0"/>
+        <define name="TRIM_PITCH" value="0"/>
+        <define name="TRIM_YAW" value="0"/>
         <define name="NB_MOTOR" value="4"/>
         <define name="SCALE" value="256"/>
         <define name="ROLL_COEF"   value="{    0,    0, -256,  256 }"/>
@@ -122,6 +82,14 @@
         <define name="YAW_COEF"    value="{ -256, -256,  256,  256 }"/>
         <define name="THRUST_COEF" value="{  256,  256,  256,  256 }"/>
     </section>
+
+    <command_laws>
+      <call fun="motor_mixing_run(autopilot_motors_on,FALSE,values)"/>
+      <set servo="FRONT"  value="motor_mixing.commands[SERVO_FRONT]"/>
+      <set servo="BACK"   value="motor_mixing.commands[SERVO_BACK]"/>
+      <set servo="RIGHT"  value="motor_mixing.commands[SERVO_RIGHT]"/>
+      <set servo="LEFT"   value="motor_mixing.commands[SERVO_LEFT]"/>
+    </command_laws>
 
     <section name="IMU" prefix="IMU_">
         <define name="GYRO_P_NEUTRAL" value="32581"/>

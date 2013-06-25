@@ -1,6 +1,5 @@
 # Hey Emacs, this is a -*- makefile -*-
 #
-#   $Id$
 #   Copyright (C) 2009 Antoine Drouin
 #
 # This file is part of paparazzi.
@@ -31,66 +30,31 @@ SRC_ARCH = arch/stm32
 # Call with "make Q=''" to get full command display
 Q=@
 
+
+#
+# find compiler toolchain
+#
+include $(PAPARAZZI_SRC)/conf/Makefile.arm-embedded
+
+
+ifeq ($(ARCH_L),f4)
+MCU   = cortex-m4
+else
 MCU   = cortex-m3
+endif
 #DEBUG = dwarf-2
 OPT   = s
 #OPT   = 2
 #OPT   = 0
 
-# Programs location
-TOOLCHAIN=$(shell find -L /opt/paparazzi/arm-multilib ~/sat /opt/paparazzi/stm32 -maxdepth 1 -type d -name arm-none-eabi 2>/dev/null | head -n 1)
-ifneq ($(TOOLCHAIN),)
-TOOLCHAIN_DIR=$(shell dirname $(TOOLCHAIN))
-GCC_BIN_DIR=$(TOOLCHAIN_DIR)/bin
-GCC_LIB_DIR=$(TOOLCHAIN_DIR)/arm-none-eabi/lib
 
-# Define programs and commands.
-GCC_BIN_PREFIX=$(GCC_BIN_DIR)/arm-none-eabi
-CC   = $(GCC_BIN_PREFIX)-gcc
-LD   = $(GCC_BIN_PREFIX)-gcc
-CP   = $(GCC_BIN_PREFIX)-objcopy
-DMP  = $(GCC_BIN_PREFIX)-objdump
-NM   = $(GCC_BIN_PREFIX)-nm
-SIZE = $(GCC_BIN_PREFIX)-size
-GDB  = $(GCC_BIN_PREFIX)-gdb
-RM   = rm
-
-# If we can't find the toolchain then try picking up the compilers from the path
-else
-CC   = $(shell which arm-none-eabi-gcc)
-LD   = $(shell which arm-none-eabi-gcc)
-CP   = $(shell which arm-none-eabi-objcopy)
-DMP  = $(shell which arm-none-eabi-objdump)
-NM   = $(shell which arm-none-eabi-nm)
-SIZE = $(shell which arm-none-eabi-size)
-GDB  = $(shell which arm-none-eabi-gdb)
-RM   = rm
-TOOLCHAIN_DIR=$(shell dirname `which arm-none-eabi-gcc`)
-GCC_LIB_DIR=$(TOOLCHAIN_DIR)/../arm-none-eabi/lib
-endif
-
-# Detect if we are using the new libopencm3 or the old libopenstm32
-LIBOPENCM3_LIB=$(shell if [ -e "$(GCC_LIB_DIR)/libopencm3_stm32f1.a" ]; then echo "opencm3_stm32f1"; else echo "opencm3_stm32"; fi)
-LIBOPENCM3_DEFS=$(shell if [ -e "$(GCC_LIB_DIR)/libopencm3_stm32f1.a" ]; then echo "-DSTM32F1"; fi)
-
-ifndef $(PYTHON)
-PYTHON = $(shell which python)
-endif
-
-#first try to find OpenOCD in the path
-OOCD = $(shell which openocd)
-#if OpenOCD could not be found in the path, try the toolchain dir
-ifeq ($(OOCD),)
-ifneq ($(TOOLCHAIN),)
-OOCD = $(shell if test -e $(TOOLCHAIN_DIR)/bin/openocd ; then echo $(TOOLCHAIN_DIR)/bin/openocd ; else echo "Warning: OpenOCD not found"; fi)
-endif
-endif
+PYTHON ?= $(shell which python)
 
 ifneq ($(BOARD_SERIAL),)
 OOCD_OPTIONS = -c "ft2232_serial $(BOARD_SERIAL)"
 endif
 
-LOADER=/home/poine/work/stm32/stm32loader-a3c51c26ad6c/stm32loader.py
+LOADER ?= $(PAPARAZZI_SRC)/sw/tools/stm32loader/stm32loader.py
 
 ifndef $(TARGET).OOCD_INTERFACE
 OOCD_INTERFACE = lisa-l
@@ -130,21 +94,28 @@ AOBJ    = $(ASRC:%.S=$(OBJDIR)/%.o)
 #   if not, use the default STM32f103re_flash.ld
 ifndef LDSCRIPT
 ifndef $(TARGET).LDSCRIPT
-LDSCRIPT = $(SRC_ARCH)/stm32f103re_flash.ld
+$(warning Linker script for target "$(TARGET)" on board "$(BOARD)" not defined. Using stm32default.ld.)
+LDSCRIPT = $(SRC_ARCH)/stm32default.ld
 else
 LDSCRIPT = $($(TARGET).LDSCRIPT)
+$(info Using "$($(TARGET).LDSCRIPT)" as ldscript for target "$(TARGET)".)
 endif
 endif
 
-#UNAME = $(shell uname -s)
-MULTILIB = $(shell if $(CC) --print-multi-lib | grep thumb2 > /dev/null ; then echo "yes"; else echo "no"; fi)
-
-CFLAGS = -I. -I./$(ARCH) $(INCLUDES) -D__thumb2__ -Wall -msoft-float -O$(OPT)
+CFLAGS = -I. -I./$(ARCH) -I../ext/libopencm3/include $(INCLUDES)
+CFLAGS += -D__thumb2__ -Wall -O$(OPT)
+ifeq ($(ARCH_L), )
+CFLAGS += -msoft-float
+else ifeq ($(ARCH_L),f4)
+ifndef HARD_FLOAT
+CFLAGS += -msoft-float
+else
+CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
+endif
+endif
 CFLAGS += -Wl,--gc-sections
-CFLAGS += -mcpu=$(MCU) -mthumb -ansi
-ifeq ("$(MULTILIB)","yes")
 CFLAGS += -mfix-cortex-m3-ldrd
-endif
+CFLAGS += -mcpu=$(MCU) -mthumb -ansi
 CFLAGS += -std=gnu99
 #CFLAGS += -malignment-traps
 CFLAGS += -fno-common
@@ -160,23 +131,41 @@ CFLAGS += -Wmissing-prototypes
 CFLAGS += -Wstrict-prototypes
 CFLAGS += -Wmissing-declarations
 CFLAGS += -Wswitch-default
-CFLAGS += $(LIBOPENCM3_DEFS)
+ifneq ($(ARCH_L), )
+ifeq ($(ARCH_L),f4)
+CFLAGS += -DSTM32F4
+endif
+else
+CFLAGS += -DSTM32F1
+endif
 
 CFLAGS += $($(TARGET).CFLAGS)
 
 AFLAGS  = -ahls -mapcs-32
-ifeq ("$(MULTILIB)","yes")
 AFLAGS += -mcpu=$(MCU) -mthumb
-endif
 AFLAGS += -x assembler-with-cpp -Wa,-adhlns=$(OBJDIR)/$(<:.S=.lst),--g$(DEBUG)
 
-ifeq ("$(MULTILIB)","yes")
-LDFLAGS = -T$(LDSCRIPT) -nostartfiles -O$(OPT) -mthumb -march=armv7 -mfix-cortex-m3-ldrd -msoft-float
+LDFLAGS += -L../ext/libopencm3/lib
+LDFLAGS += -T$(LDSCRIPT) -nostartfiles -O$(OPT) -mthumb -mcpu=$(MCU)
+
+ifeq ($(ARCH_L), )
+LDFLAGS += -mfix-cortex-m3-ldrd -msoft-float
+else ifeq ($(ARCH_L),f4)
+ifndef HARD_FLOAT
+LDFLAGS += -mfix-cortex-m3-ldrd -msoft-float
 else
-LDFLAGS = -D__thumb2__ -T$(LDSCRIPT) -nostartfiles  -L$(GCC_LIB_DIR) -O$(OPT)
+LDFLAGS += -lnosys -D__thumb2__\
+           -mfloat-abi=hard -mfpu=fpv4-sp-d16
 endif
+endif
+
 LDFLAGS += -Wl,-Map=$(OBJDIR)/$(TARGET).map,--cref,--gc-sections
-LDLIBS  += -lc -lm -lgcc -lcmsis -lstm32 -l$(LIBOPENCM3_LIB)
+ifneq ($(ARCH_L), )
+LDLIBS  += -lopencm3_stm32$(ARCH_L)
+else
+LDLIBS  += -lopencm3_stm32f1
+endif
+LDLIBS  += -lc -lm -lgcc
 
 CPFLAGS = -j .isr_vector -j .text -j .data
 CPFLAGS_BIN = -Obinary
@@ -187,27 +176,7 @@ ODFLAGS = -S
 
 
 # Default target.
-all: printcommands printmultilib sizebefore build sizeafter
-
-printcommands:
-	@echo "Using CC   = $(CC)"
-	@echo "Using LD   = $(LD)"
-	@echo "Using CP   = $(CP)"
-	@echo "Using DMP  = $(DMP)"
-	@echo "Using NM   = $(NM)"
-	@echo "Using SIZE = $(SIZE)"
-	@echo "GCC version:"
-	@$(CC) --version | head -1
-
-ifeq ("$(MULTILIB)","yes")
-printmultilib:
-	@echo "*** Using multilib ***"
-	@echo "--------------------------------------"
-else
-printmultilib:
-	@echo "*** NOT using multilib ***"
-	@echo "--------------------------------------"
-endif
+all: printcommands sizebefore build sizeafter
 
 build: elf bin hex
 # lss sym
@@ -217,16 +186,6 @@ bin: $(OBJDIR)/$(TARGET).bin
 hex: $(OBJDIR)/$(TARGET).hex
 lss: $(OBJDIR)/$(TARGET).lss
 sym: $(OBJDIR)/$(TARGET).sym
-
-# Display size of file.
-ELFSIZE = $(SIZE) -Ax $(OBJDIR)/$(TARGET).elf
-sizebefore:
-	@if [ -f $(OBJDIR)/$(TARGET).elf ]; then echo; echo "Previous size:"; $(ELFSIZE); fi
-
-sizeafter:
-	@if [ -f $(OBJDIR)/$(TARGET).elf ]; then echo; echo "Current size:"; $(ELFSIZE); fi
-
-
 
 %.bin: %.elf
 	@echo OBJCB $@
@@ -268,15 +227,42 @@ $(AOBJ) : $(OBJDIR)/%.o : %.S
 	$(Q)test -d $(dir $@) || mkdir -p $(dir $@)
 	$(Q)$(CC) -c $(AFLAGS) $< -o $@
 
+#
+# check which flash mode is configured
+#
 ifeq ($(FLASH_MODE),DFU)
+ifeq ($(DFU_UTIL),y)
+#
+# DFU flash mode using dfu-util
+DFU_ADDR ?= 0x08000000
+upload: $(OBJDIR)/$(TARGET).bin
+	@echo "Using dfu-util at $(DFU_ADDR)"
+	$(Q)dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s $(DFU_ADDR) -D $^
+else
+#
+# DFU flash mode paparazzi stm32_mem
+ifdef DFU_ADDR
+DFU_ADDR_CMD = --addr=$(DFU_ADDR)
+endif
+ifdef DFU_PRODUCT
+DFU_PRODUCT_CMD = --product=$(DFU_PRODUCT)
+endif
 upload: $(OBJDIR)/$(TARGET).bin
 	@echo "Using stm32 mem dfu loader"
-	$(PYTHON) $(PAPARAZZI_SRC)/sw/tools/dfu/stm32_mem.py $^
+	$(PYTHON) $(PAPARAZZI_SRC)/sw/tools/dfu/stm32_mem.py $(DFU_PRODUCT_CMD) $(DFU_ADDR_CMD) $^
+endif
+
+#
+# serial flash mode
 else ifeq ($(FLASH_MODE),SERIAL)
 upload: $(OBJDIR)/$(TARGET).bin
 	$(LOADER) -p /dev/ttyUSB0  -b 115200 -e -w -v $^
+#
+# JTAG flash mode
 else ifeq ($(FLASH_MODE),JTAG)
+# either via normal jtag or BlackMagicProbe
 ifeq ($(BMP_PORT),)
+# normal jtag via OpenOCD
 upload: $(OBJDIR)/$(TARGET).hex
 	@echo "Assuming luftboot bootloader: $(ASSUMING_LUFTBOOT)"
 	@echo "Using OOCD = $(OOCD)"
@@ -291,70 +277,51 @@ upload: $(OBJDIR)/$(TARGET).hex
 		-c reset \
 		-c shutdown
 else
+# jtag via BMP
+BMP_UPLOAD_SCRIPT ?= $(PAPARAZZI_SRC)/sw/tools/flash_scripts/bmp_jtag_flash.scr
+
 upload: $(OBJDIR)/$(TARGET).elf
-	@echo "Using Black Magic Probe"
+	@echo "Assuming luftboot bootloader: $(ASSUMING_LUFTBOOT)"
+	@echo "Using Black Magic Probe with JTAG on BMP_PORT $(BMP_PORT)"
 	@echo "Using GDB = $(GDB)"
 	@echo "  BMP\t$<"
 	$(Q)$(GDB) --batch \
 		   -ex 'target extended-remote $(BMP_PORT)' \
-		   -x $(TOOLCHAIN_DIR)/arm-none-eabi/share/libopencm3/scripts/black_magic_probe_flash.scr \
+		   -x $(BMP_UPLOAD_SCRIPT) \
 		   $<
 endif
+#
+# SWD flash mode
+else ifeq ($(FLASH_MODE),SWD)
+# only works if BMP_PORT is defined
+ifeq ($(STLINK),y)
+STLINK_ADDR ?= 0x08000000
+upload: $(OBJDIR)/$(TARGET).bin
+	@echo "Using ST-LINK with SWD at $(STLINK_ADDR)"
+	$(Q)st-flash write $^ $(STLINK_ADDR)
+else
+BMP_PORT ?= /dev/ttyACM0
+BMP_UPLOAD_SCRIPT ?= $(PAPARAZZI_SRC)/sw/tools/flash_scripts/bmp_swd_flash.scr
+upload: $(OBJDIR)/$(TARGET).elf
+	@echo "Assuming luftboot bootloader: $(ASSUMING_LUFTBOOT)"
+	@echo "Using Black Magic Probe with SWD on BMP_PORT $(BMP_PORT)"
+	@echo "Using GDB = $(GDB)"
+	@echo "  BMP\t$<"
+	$(Q)$(GDB) --batch \
+		   -ex 'target extended-remote $(BMP_PORT)' \
+		   -x $(BMP_UPLOAD_SCRIPT) \
+		   $<
+endif
+#
+# no known flash mode
 else
 upload:
 	@echo unknown flash_mode $(FLASH_MODE)
 endif
 
 
-start_gdb:
-	xterm -e "$(OOCD) -f interface/$(OOCD_INTERFACE).cfg  -f target/$(OOCD_TARGET).cfg" &
-	xterm -e "$(OOCD) -f interface/lisa-l.cfg -f board/lisa-l.cfg"&
-	xterm -e "$(OOCD) -f interface/flossjtag.cfg -f board/lisa-l.cfg"&
-
-start_telnet:
-	xterm -e "telnet localhost 4444" &
-#reset halt
-#flash probe 0
-#stm32x mass_erase 0
-#flash write_bank 0 main.bin 0
-#reset halt
-
-#/opt/paparazzi/stm32/bin/arm-none-eabi-gdbtui --eval-command="target remote localhost:3333"
-#/opt/paparazzi/stm32/bin/arm-none-eabi-gdbtui --eval-command="target remote localhost:3333" var/BOOZ2_A6/ap/ap.elf
-
-
-# Target: clean project.
-clean: clean_list
-
-
-clean_list :
-	@echo
-	$(RM) $(OBJDIR)/$(TARGET).hex
-	$(RM) $(OBJDIR)/$(TARGET).obj
-	$(RM) $(OBJDIR)/$(TARGET).elf
-	$(RM) $(OBJDIR)/$(TARGET).map
-	$(RM) $(OBJDIR)/$(TARGET).obj
-	$(RM) $(OBJDIR)/$(TARGET).a90
-	$(RM) $(OBJDIR)/$(TARGET).sym
-	$(RM) $(OBJDIR)/$(TARGET).lnk
-	$(RM) $(OBJDIR)/$(TARGET).lss
-	$(RM) $(COBJ)
-	$(RM) $(AOBJ)
-	$(RM) $(COBJARM)
-	$(RM) $(AOBJARM)
-	$(RM) $(LST)
-	$(RM) $(SRC:.c=.s)
-	$(RM) $(SRC:.c=.d)
-	$(RM) $(SRCARM:.c=.s)
-	$(RM) $(SRCARM:.c=.d)
-	$(RM) .dep/*
-	$(RM) *~
-
-
 # Listing of phony targets.
-.PHONY : all sizebefore sizeafter \
-build elf bin lss sym clean clean_list upload
-
+.PHONY : all build elf bin lss sym upload start_gdb start_telnet
 
 #
 # Dependencies
@@ -366,7 +333,5 @@ $(OBJDIR)/.depend:
 	$(Q)$(CC) -MM -MG $(THUMB) $(CFLAGS) $($(TARGET).srcs) | sed 's|\([^\.]*\.o\)|$(OBJDIR)/\1|' > $@
 
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),erase)
 -include $(OBJDIR)/.depend
-endif
 endif

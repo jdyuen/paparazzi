@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2011  Christophe De Wagter
  *
  * This file is part of paparazzi.
@@ -22,7 +20,7 @@
  *
  */
 
-/** \file I2C_ABUSE_TEST_module.h
+/** @file modules/benchmark/i2c_abuse_test.h
  *
  * Total I2C Abuse:
  *

@@ -88,7 +88,7 @@
     <define name="NOMINAL_AIRSPEED" value="11." unit="m/s"/>
     <define name="CARROT" value="3." unit="s"/>
     <define name="KILL_MODE_DISTANCE" value="(1.5*MAX_DIST_FROM_HOME)"/>
-    <define name="CONTROL_RATE" value="60" unit="Hz"/>
+    <define name="CONTROL_FREQUENCY" value="60" unit="Hz"/>
 <!--    <define name="XBEE_INIT" value="\"ATPL2\rATRN1\rATTT80\rATBD6\rATWR\r\""/> -->
     <define name="XBEE_INIT" value="\"ATPL2\rATRN1\rATTT80\r\""/>
 <!--    <define name="NO_XBEE_API_INIT" value="TRUE"/> -->
@@ -142,7 +142,6 @@
   </section>
 
   <section name="NAV">
-    <define name="NAV_PITCH" value="0."/>
     <define name="NAV_GLIDE_PITCH_TRIM" value="0"/>
     <define name="NAV_GROUND_SPEED_PGAIN" value="0.015"/>
     <define name="NAV_FOLLOW_PGAIN" value="-0.05"/>
@@ -210,7 +209,7 @@ ap.srcs += $(SRC_ARCH)/servos_4015_MAT_hw.c actuators.c
 ap.CFLAGS += -DRADIO_CONTROL -DRADIO_CONTROL_TYPE=RC_FUTABA
 ap.srcs += radio_control.c $(SRC_ARCH)/ppm_hw.c
 
-ap.CFLAGS += -DDOWNLINK -DUSE_UART0 -DDOWNLINK_TRANSPORT=XBeeTransport -DDOWNLINK_FBW_DEVICE=Uart0 -DDOWNLINK_AP_DEVICE=Uart0 -DXBEE_UART=Uart0 -DDATALINK=XBEE -DUART0_BAUD=B57600
+ap.CFLAGS += -DDOWNLINK -DUSE_UART0 -DDOWNLINK_TRANSPORT=XBeeTransport -DDOWNLINK_FBW_DEVICE=UART0 -DDOWNLINK_AP_DEVICE=UART0 -DXBEE_UART=UART0 -DDATALINK=XBEE -DUART0_BAUD=B57600
 ap.srcs += subsystems/datalink/downlink.c $(SRC_ARCH)/uart_hw.c datalink.c subsystems/datalink/xbee.c
 
 ap.CFLAGS += -DINTER_MCU
@@ -219,7 +218,7 @@ ap.srcs += inter_mcu.c
 ap.CFLAGS += -DADC -DUSE_ADC_0 -DUSE_ADC_1 -DUSE_ADC_2
 ap.srcs += $(SRC_ARCH)/adc_hw.c
 
-ap.CFLAGS += -DGPS -DUBX -DUSE_UART1 -DGPS_LINK=Uart1 -DUART1_BAUD=B38400
+ap.CFLAGS += -DGPS -DUBX -DUSE_UART1 -DGPS_LINK=UART1 -DUART1_BAUD=B38400
 
 ap.srcs += gps_ubx.c gps.c latlong.c
 

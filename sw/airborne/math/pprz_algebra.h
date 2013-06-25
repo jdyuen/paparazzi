@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008  Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -626,6 +624,18 @@
     (_ri).p = RATE_BFP_OF_REAL((_rf).p);		\
     (_ri).q = RATE_BFP_OF_REAL((_rf).q);		\
     (_ri).r = RATE_BFP_OF_REAL((_rf).r);		\
+  }
+
+#define SPEEDS_FLOAT_OF_BFP(_ef, _ei) {			\
+    (_ef).x = SPEED_FLOAT_OF_BFP((_ei).x);		\
+    (_ef).y = SPEED_FLOAT_OF_BFP((_ei).y);		\
+    (_ef).z = SPEED_FLOAT_OF_BFP((_ei).z);		\
+  }
+
+#define SPEEDS_BFP_OF_REAL(_ef, _ei) {			\
+    (_ef).x = SPEED_BFP_OF_REAL((_ei).x);		\
+    (_ef).y = SPEED_BFP_OF_REAL((_ei).y);		\
+    (_ef).z = SPEED_BFP_OF_REAL((_ei).z);		\
   }
 
 #define ACCELS_FLOAT_OF_BFP(_ef, _ei) {			\

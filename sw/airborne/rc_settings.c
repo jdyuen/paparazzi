@@ -1,6 +1,4 @@
 /*
- * $Id$
- * Flight-time calibration facility
  *
  * Copyright (C) 2003-2005  Pascal Brisset, Antoine Drouin
  *
@@ -30,7 +28,6 @@
 #include "autopilot.h"
 #include "subsystems/nav.h"
 #include "subsystems/sensors/infrared.h"
-#include "estimator.h"
 #include "inter_mcu.h"
 #include "firmwares/fixedwing/stabilization/stabilization_attitude.h"
 

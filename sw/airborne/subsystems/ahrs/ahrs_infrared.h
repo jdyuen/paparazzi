@@ -19,24 +19,27 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file subsystems/ahrs/ahrs_infrared.h
+ *
+ * Fixedwing attitude estimation using infrared sensors.
+ *
+ */
+
 #ifndef AHRS_INFRARED_H
 #define AHRS_INFRARED_H
 
 #include "subsystems/ahrs.h"
 #include "std.h"
 
-// TODO: harmonize infrared neutrals with ins_neutrals
-// or get rid of ins neutrals
-// this ins only needed for sim right now
+/**
+ * @todo harmonize infrared neutrals with ins_neutrals
+ * or get rid of ins neutrals
+ * this ins only needed for sim right now
+ */
 extern float ins_roll_neutral;
 extern float ins_pitch_neutral;
 
 extern void ahrs_update_infrared(void);
-
-// TODO copy ahrs to state instead of estimator
-extern void ahrs_update_fw_estimator(void);
-
-#define AhrsEvent(_available_callback) {        \
-  }
 
 #endif /* AHRS_INFRARED_H */

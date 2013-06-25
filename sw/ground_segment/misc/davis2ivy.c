@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2011 Andreas Gaeb
  *
  * This file is part of paparazzi.
@@ -103,7 +101,8 @@ void open_port(const char* device) {
 
 /// disable transactions and empty queue
 void reset_station() {
-  char newline = '\n', bytes = 0;
+  char newline = '\n';
+  char bytes __attribute__ ((unused));
   fprintf(stderr, "Resetting communication\n");
   // send a \n (wakeup and cancel all running transmits)
   bytes = write(fd, &newline, 1);
@@ -179,7 +178,8 @@ void decode_and_send_to_ivy() {
     pstatic_Pa = (packet[7] | packet[8] << 8)*3.386388640341, // original is inches Hg / 1000
     temp_degC = ((packet[12] | packet[13] << 8)/10.0 - 32.0)*5.0/9.0, // original is deg F / 10
     windspeed_mps = packet[14]*0.44704, // original is miles per hour
-    winddir_deg = packet[16] | packet[17] << 8;
+    winddir_deg = packet[16] | packet[17] << 8,
+    rel_humidity = -1.; // TODO Get the real humidity value from message
 
 
   // TODO get the real MD5 for the aircraft id
@@ -187,8 +187,8 @@ void decode_and_send_to_ivy() {
     IvySendMsg("%d ALIVE 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0\n", ac_id);
 
   // format has to match declaration in conf/messages.xml
-  IvySendMsg("%d WEATHER %f %f %f %f\n",
-    ac_id, pstatic_Pa, temp_degC, windspeed_mps, winddir_deg);
+  IvySendMsg("%d WEATHER %f %f %f %f %f\n",
+    ac_id, pstatic_Pa, temp_degC, windspeed_mps, winddir_deg, rel_humidity);
 }
 
 /// Get data from the station and send it via Ivy

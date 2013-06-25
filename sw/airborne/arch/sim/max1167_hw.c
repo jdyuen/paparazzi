@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008  Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -40,6 +38,6 @@ void max1167_hw_feed_value(VEC* gyro, VEC* accel) {
   buf_ay.sum =  accel->ve[AXIS_Y];
   buf_az.sum =  accel->ve[AXIS_Z];
 
-  max1167_status = STA_MAX1167_DATA_AVAILABLE;
+  max1167_status = MAX1167_DATA_AVAILABLE;
 
 }

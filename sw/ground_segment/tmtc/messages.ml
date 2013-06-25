@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Multi aircrafts receiver, logger and broadcaster
  *
  * Copyright (C) 2005 CENA/ENAC, Pascal Brisset, Antoine Drouin
@@ -67,7 +65,7 @@ let one_page = fun sender class_name (notebook:GPack.notebook) bind m ->
           let literal_values = values_of_field f in
           let alt_value =
             try
-              let coeff = float_of_string (Pprz.alt_unit_coef_of_xml f)
+              let coeff = float_of_string (Pprz.alt_unit_coef_of_xml ~auto:"display" f)
               and unit = Xml.attrib f "alt_unit" in
               fun value -> sprintf "%s (%f%s)" value (coeff*.float_of_string value) unit
             with
@@ -86,7 +84,7 @@ let one_page = fun sender class_name (notebook:GPack.notebook) bind m ->
           (* box dragger *)
           field_label#drag#source_set dnd_targets ~modi:[`BUTTON1] ~actions:[`COPY];
           let data_get = fun _ (sel:GObj.selection_context) ~info ~time ->
-            let scale = Pprz.alt_unit_coef_of_xml f in
+            let scale = Pprz.alt_unit_coef_of_xml ~auto:"display" f in
             let field_descr =
               if Pprz.is_array_type type_ then
                 match GToolbox.input_string ~title:"Index of value to drag" ~text:"0" "Index in the array ?" with
@@ -162,20 +160,20 @@ let rec one_class = fun (notebook:GPack.notebook) (ident, xml_class, sender) ->
     | Some "*" ->
       (* Waiting for a new sender in this class *)
       let get_one = fun sender _vs ->
-	    if not (Hashtbl.mem senders sender) then begin
-	      Hashtbl.add senders sender ();
-	      one_class notebook (ident,  xml_class, Some sender)
-	    end in
+        if not (Hashtbl.mem senders sender) then begin
+          Hashtbl.add senders sender ();
+          one_class notebook (ident,  xml_class, Some sender)
+        end in
       List.iter
-	    (fun m -> ignore (P.message_bind (Xml.attrib m "name") get_one))
-	    messages
+        (fun m -> ignore (P.message_bind (Xml.attrib m "name") get_one))
+        messages
     | _ ->
       let class_notebook = GPack.notebook ~tab_border:0 ~tab_pos:`LEFT () in
       let l = match sender with None -> "" | Some s -> ":"^s in
       let label = GMisc.label ~text:(ident^l) () in
       ignore (notebook#append_page ~tab_label:label#coerce class_notebook#coerce);
       let bind, sender_name = match sender with
-	      None -> (fun m cb -> (P.message_bind m cb)), "*"
+          None -> (fun m cb -> (P.message_bind m cb)), "*"
         | Some sender -> (fun m cb -> (P.message_bind ~sender m cb)), sender in
 
       (** Forall messages in the class *)
@@ -212,12 +210,12 @@ let _ =
     let xml = Pprz.messages_xml () in
     let class_of = fun n ->
       try
-	    List.find (fun x -> ExtXml.attrib x "name" = n) (Xml.children xml)
+        List.find (fun x -> ExtXml.attrib x "name" = n) (Xml.children xml)
       with Not_found -> failwith (sprintf "Unknown messages class: %s" n) in
 
     List.map (fun x ->
       match Str.split (Str.regexp ":") x with
-	      [cl; s] -> (cl, class_of cl, Some s)
+          [cl; s] -> (cl, class_of cl, Some s)
         | [cl] -> (x, class_of cl, None)
         | _ -> failwith (sprintf "Wrong class '%s', class[:sender] expected" x))
       !classes in

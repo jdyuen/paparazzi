@@ -1,7 +1,5 @@
 /*
- * Paparazzi stm32 arch dependant microcontroller initialisation function
- *
- * Copyright (C) 2010 The Paparazzi team
+ * Copyright (C) 2010-2012 The Paparazzi team
  *
  * This file is part of Paparazzi.
  *
@@ -22,83 +20,56 @@
  *
  */
 
+/**
+ * @file arch/stm32/mcu_arch.c
+ * @brief stm32 arch dependant microcontroller initialisation functions.
+ * @ingroup stm32_arch
+ */
+
 #include "mcu.h"
 
 #include BOARD_CONFIG
 
 #include <inttypes.h>
-#include <stm32/gpio.h>
-#include <stm32/rcc.h>
-#include <stm32/flash.h>
-#include <stm32/misc.h>
-#if USE_OPENCM3
-#	if defined(STM32F1) || defined(STM32F2) || defined(STM32F4)
-#		include <libopencm3/stm32/f1/rcc.h>
-#	else
-#		include <libopencm3/stm32/rcc.h>
-#	endif
+#include <libopencm3/stm32/gpio.h>
+#include <libopencm3/stm32/rcc.h>
+#if defined(STM32F1)
+#include <libopencm3/stm32/f1/flash.h>
+#elif defined(STM32F4)
+#include <libopencm3/stm32/f4/flash.h>
 #endif
+#include <libopencm3/cm3/scb.h>
 
+#include "std.h"
 
 void mcu_arch_init(void) {
-#if USE_OPENCM3
-  rcc_clock_setup_in_hse_12mhz_out_72mhz();
-  /* Don't mess around with this as the address is set by luftboot. Otherwise the default should be ok. */
-  /*NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x0);*/
-  return;
-#else // !USE_OPENCM3
-#ifdef HSE_TYPE_EXT_CLK
-#pragma message "Using external clock."
-  /* Setup the microcontroller system.
-   *  Initialize the Embedded Flash Interface,
-   *  initialize the PLL and update the SystemFrequency variable.
-   */
-  /* RCC system reset(for debug purpose) */
-  RCC_DeInit();
-  /* Enable HSE with external clock ( HSE_Bypass ) */
-  RCC_HSEConfig( STM32_RCC_MODE );
-  /* Wait till HSE is ready */
-  ErrorStatus HSEStartUpStatus = RCC_WaitForHSEStartUp();
-  if (HSEStartUpStatus != SUCCESS) {
-    /* block if something went wrong */
-    while(1) {}
-  }
-  else {
-    /* Enable Prefetch Buffer */
-    FLASH_PrefetchBufferCmd(FLASH_PrefetchBuffer_Enable);
-    /* Flash 2 wait state */
-    FLASH_SetLatency(FLASH_Latency_2);
-    /* HCLK = SYSCLK */
-    RCC_HCLKConfig(RCC_SYSCLK_Div1);
-    /* PCLK2 = HCLK */
-    RCC_PCLK2Config(RCC_HCLK_Div1);
-    /* PCLK1 = HCLK/2 */
-    RCC_PCLK1Config(RCC_HCLK_Div2);
-    /* PLLCLK = 8MHz * 9 = 72 MHz */
-    RCC_PLLConfig(RCC_PLLSource_HSE_Div1, STM32_PLL_MULT);
-    /* Enable PLL */
-    RCC_PLLCmd(ENABLE);
-    /* Wait till PLL is ready */
-    while (RCC_GetFlagStatus(RCC_FLAG_PLLRDY) == RESET) {}
-    /* Select PLL as system clock source */
-    RCC_SYSCLKConfig(RCC_SYSCLKSource_PLLCLK);
-    /* Wait till PLL is used as system clock source */
-    while(RCC_GetSYSCLKSource() != 0x08) {}
-  }
-#else  /* HSE_TYPE_EXT_CLK */
-#pragma message "Using normal system clock setup."
-  SystemInit();
-#endif /* HSE_TYPE_EXT_CLK */
-  /* Set the Vector Table base location at 0x08000000 */
-  /* Don't mess around with this as the address is set by luftboot. Otherwise the default should be ok. */
-  /*NVIC_SetVectorTable(NVIC_VectTab_FLASH, 0x0);*/
-
-#ifdef STM32_FORCE_ALL_CLOCK_ON
-  RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB |
-                         RCC_APB2Periph_GPIOC | RCC_APB2Periph_GPIOD |
-                         RCC_APB2Periph_GPIOE | RCC_APB2Periph_AFIO, ENABLE);
+#if LUFTBOOT
+PRINT_CONFIG_MSG("We are running luftboot, the interrupt vector is being relocated.")
+  SCB_VTOR = 0x00002000;
 #endif
-
-#endif // USE_OPENCM3
+#if EXT_CLK == 8000000
+#if defined(STM32F1)
+PRINT_CONFIG_MSG("Using 8MHz external clock to PLL it to 72MHz.")
+  rcc_clock_setup_in_hse_8mhz_out_72mhz();
+#elif defined(STM32F4)
+PRINT_CONFIG_MSG("Using 8MHz external clock to PLL it to 168MHz.")
+  rcc_clock_setup_hse_3v3(&hse_8mhz_3v3[CLOCK_3V3_168MHZ]);
+#endif
+#elif EXT_CLK == 12000000
+#if defined(STM32F1)
+PRINT_CONFIG_MSG("Using 12MHz external clock to PLL it to 72MHz.")
+  rcc_clock_setup_in_hse_12mhz_out_72mhz();
+#elif defined(STM32F4)
+PRINT_CONFIG_MSG("Using 12MHz external clock to PLL it to 168MHz.")
+  rcc_clock_setup_hse_3v3(&hse_12mhz_3v3[CLOCK_3V3_168MHZ]);
+#endif
+#elif EXT_CLK == 16000000
+#if defined(STM32F4)
+PRINT_CONFIG_MSG("Using 16MHz external clock to PLL it to 168MHz.")
+  rcc_clock_setup_hse_3v3(&hse_16mhz_3v3[CLOCK_3V3_168MHZ]);
+#endif
+#else
+#error EXT_CLK is either set to an unsupported frequency or not defined at all. Please check!
+#endif
 }
 

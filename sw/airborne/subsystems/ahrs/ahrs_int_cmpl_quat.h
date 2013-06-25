@@ -19,6 +19,15 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file subsystems/ahrs/ahrs_int_cmpl_quat.h
+ *
+ * Quaternion complementary filter (fixed-point).
+ *
+ * Estimate the attitude, heading and gyro bias.
+ *
+ */
+
 #ifndef AHRS_INT_CMPL_H
 #define AHRS_INT_CMPL_H
 
@@ -28,9 +37,12 @@
 
 struct AhrsIntCmpl {
   struct Int32Rates  gyro_bias;
+  struct Int32Rates  imu_rate;
   struct Int32Rates  rate_correction;
   struct Int64Quat   high_rez_quat;
   struct Int64Rates  high_rez_bias;
+  struct Int32Quat   ltp_to_imu_quat;
+  struct Int32Vect3 mag_h;
   int32_t ltp_vel_norm;
   bool_t ltp_vel_norm_valid;
   bool_t correct_gravity;
@@ -55,8 +67,6 @@ void ahrs_update_heading(int32_t heading);
 void ahrs_realign_heading(int32_t heading);
 
 #ifdef AHRS_UPDATE_FW_ESTIMATOR
-// TODO copy ahrs to state instead of estimator
-void ahrs_update_fw_estimator(void);
 extern float ins_roll_neutral;
 extern float ins_pitch_neutral;
 #endif

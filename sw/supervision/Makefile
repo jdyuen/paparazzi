@@ -1,49 +1,92 @@
-# Quiet
+# Hey Emacs, this is a -*- makefile -*-
+#
+#   Copyright (C) 2004-2012 Pascal Brisset, Antoine Drouin
+#
+# This file is part of paparazzi.
+#
+# paparazzi is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# paparazzi is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with paparazzi; see the file COPYING.  If not, write to
+# the Free Software Foundation, 59 Temple Place - Suite 330,
+# Boston, MA 02111-1307, USA.
+
+# The default is to produce a quiet echo of compilation commands
+# Launch with "make Q=''" to get full echo
 Q=@
 
-OCAMLC = ocamlc
-OCAMLOPT = ocamlopt
-OCAMLLIB = ../lib/ocaml
-INCLUDES= -I $(OCAMLLIB) $(shell ocamlfind query -r -i-format lablgtk2) $(shell ocamlfind query -r -i-format xml-light)
-LIBPPRZCMA=$(OCAMLLIB)/lib-pprz.cma
+include ../Makefile.ocaml
+
+UNAME = $(shell uname -s)
+ifeq ("$(UNAME)","Darwin")
+	MKTEMP = gmktemp
+else
+	MKTEMP = mktemp
+endif
+
+LABLGTK2GNOMEUI = $(shell ocamlfind query -p-format lablgtk2-gnome.gnomeui 2>/dev/null)
+ifeq ($(LABLGTK2GNOMEUI),)
+LABLGTK2GNOMEUI = $(shell ocamlfind query -p-format lablgtk2.gnomeui 2>/dev/null)
+endif
+
+INCLUDES =
+XPKG = -package pprz.xlib,$(LABLGTK2GNOMEUI)
+XLINKPKG = $(XPKG) -linkpkg -dllpath-pkg pprz.xlib
+
 PAPARAZZICENTERCMO = gtk_pc.cmo gtk_process.cmo pc_common.cmo pc_aircraft.cmo pc_control_panel.cmo paparazzicenter.cmo
 
 all: paparazzicenter
 
-paparazzicenter : $(PAPARAZZICENTERCMO) $(OCAMLLIB)/lib-pprz.cma
+paparazzicenter : $(PAPARAZZICENTERCMO)
 	@echo OL $@
-	$(Q)$(OCAMLC) -custom $(INCLUDES) -o $@ unix.cma str.cma xml-light.cma lablgtk.cma lablglade.cma gtkInit.cmo lib-pprz.cma xlib-pprz.cma lablgnomeui.cma $^
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(XLINKPKG) gtkInit.cmo $^
 
 gtk_pc.ml : paparazzicenter.glade
-	grep -v invisible_char $< > /tmp/$<
-	lablgladecc2 -hide-default -root window /tmp/$< > $@
+	@echo GLADE $@
+	$(eval $@_TMP := $(shell $(MKTEMP)))
+	$(Q)grep -v invisible_char $< > $($@_TMP)
+	$(Q)lablgladecc2 -hide-default -root window $($@_TMP) > $@
+	$(Q)rm -f $($@_TMP)
 
 gtk_process.ml : paparazzicenter.glade
-	grep -v invisible_char $< > /tmp/$<
-	lablgladecc2 -hide-default -root hbox_program /tmp/$< | grep -B 1000000 "  end" > $@
+	@echo GLADE $@
+	$(eval $@_TMP := $(shell $(MKTEMP)))
+	$(Q)grep -v invisible_char $< > $($@_TMP)
+	$(Q)lablgladecc2 -hide-default -root hbox_program $($@_TMP) | grep -B 1000000 "  end" > $@
+	$(Q)rm -f $($@_TMP)
 
 %.cmo : %.ml
 	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(INCLUDES) -c $(XPKG) $<
 
 %.cmi : %.mli
 	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) $<
+	$(Q)$(OCAMLC) $(INCLUDES) -c $(XPKG) $<
 
-paparazzicenter.cmo : gtk_pc.cmo gtk_process.cmo pc_common.cmo pc_control_panel.cmo pc_aircraft.cmo
+pc_common.cmo: gtk_process.cmo
 
-pc_control_panel.cmo pc_aircraft.cmo : pc_common.cmo
+paparazzicenter.cmo : gtk_pc.cmo
 
 clean:
-	\rm -f *.cm* gtk_pc.ml gtk_process.ml .depend paparazzicenter
+	$(Q)rm -f *.cm* gtk_pc.ml gtk_process.ml .depend paparazzicenter
+
+.PHONY: all clean
 
 #
 # Dependencies
 #
 
-.depend:
-	ocamldep -I ../lib/ocaml *.ml* > .depend
+.depend: Makefile
+	$(OCAMLDEP) -I $(LIBPPRZDIR) *.ml* > .depend
 
-ifneq ($(MAKECMDGOALS),clean) 
+ifneq ($(MAKECMDGOALS),clean)
 -include .depend
 endif

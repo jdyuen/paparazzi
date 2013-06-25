@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Paparazzi center utilities
  *
  * Copyright (C) 2007 ENAC, Pascal Brisset, Antoine Drouin
@@ -33,35 +31,29 @@ let conf_dir = Env.paparazzi_home // "conf"
 let my_open_process_in = fun cmd ->
   let (in_read, in_write) = Unix.pipe () in
   let inchan = Unix.in_channel_of_descr in_read in
-  let pid = Unix.create_process_env "/bin/sh" [|"/bin/sh"; "-c"; cmd|] (Array.append (Unix.environment ()) [|"GTK_SETLOCALE=0"|]) Unix.stdin in_write Unix.stderr in
+  let pid = Unix.create_process_env "/bin/sh" [|"/bin/sh"; "-c"; cmd|] (Array.append (Unix.environment ()) [|"GTK_SETLOCALE=0";"LANG=C"|]) Unix.stdin in_write Unix.stderr in
   Unix.close in_write;
   pid, inchan
 
-let buf_size = 1024
+let buf_size = 512
 
 let run_and_log = fun log com ->
   let com = com ^ " 2>&1" in
   let pid, com_stdout = my_open_process_in com in
   let channel_out = GMain.Io.channel_of_descr (Unix.descr_of_in_channel com_stdout) in
   let cb = fun ev ->
-    if List.mem `IN ev then begin
-      let buf = String.create buf_size in
-      (* loop until input returns zero *)
-      let rec log_input = fun out ->
-        let n = input out buf 0 buf_size in
-        if n < buf_size then log (String.sub buf 0 n)
-        else begin
-          log buf;
-          log_input out
-        end;
-      in
-      log_input com_stdout;
-      true
-    end else begin
-      log (sprintf "\nDONE (%s)\n\n" com);
-      false
-    end in
-  let io_watch_out = Glib.Io.add_watch [`IN; `HUP] cb channel_out in
+    let buf = String.create buf_size in
+    (* loop until input returns zero *)
+    let rec log_input = fun out ->
+      let n = input out buf 0 buf_size in
+      (* split on beginning of new line *)
+      let s = Str.split (Str.regexp "^") (String.sub buf 0 n) in
+      List.iter (fun l -> log l) s;
+      if n = buf_size then log_input out
+    in
+    log_input com_stdout;
+    true in
+  let io_watch_out = Glib.Io.add_watch [`IN] cb channel_out in
   pid, channel_out, com_stdout, io_watch_out
 
 let strip_prefix = fun dir file ->
@@ -83,14 +75,14 @@ let choose_xml_file = fun ?(multiple = false) title subdir cb ->
   dialog#add_select_button_stock `OPEN `OPEN ;
   dialog#set_select_multiple multiple;
   begin match dialog#run (), dialog#filename with
-  | `OPEN, _ when multiple ->
+    | `OPEN, _ when multiple ->
       let names = dialog#get_filenames in
       dialog#destroy ();
       cb (List.map (fun f -> subdir // strip_prefix dir f) names)
-  | `OPEN, Some name ->
+    | `OPEN, Some name ->
       dialog#destroy ();
       cb [subdir // strip_prefix dir name]
-  | _ -> dialog#destroy ()
+    | _ -> dialog#destroy ()
   end
 
 
@@ -106,13 +98,13 @@ let run_and_monitor = fun ?(once = false) ?file gui log com_name com args ->
   and watches = ref [] in
   let run = fun callback ->
     let c = p#entry_program#text in
-    log (sprintf "Run '%s'\n" c);
+    log (sprintf "RUN '%s'\n" c);
     let (pi, out, unixfd, io_watch) = run_and_log log ("exec "^c) in
-    let stop_cb_delay = 500 in (* ms *)
     pid := pi;
     outchan := unixfd;
     let io_watch' = Glib.Io.add_watch [`HUP;`OUT] (fun _ ->
-      ignore (Glib.Timeout.add stop_cb_delay (fun () -> callback true; false));
+      (* call with a delay of 200ms, not strictly needed anymore, but seems more pleasing to the eye *)
+      ignore (Glib.Timeout.add 200 (fun () -> callback true; false));
       false) out in
     watches := [ io_watch; io_watch'] in
 
@@ -121,22 +113,29 @@ let run_and_monitor = fun ?(once = false) ?file gui log com_name com args ->
 
   let rec callback = fun stop ->
     match p#button_stop#label, stop with
-      "gtk-stop", _ ->
-    List.iter Glib.Io.remove !watches;
-    close_in !outchan;
-    ignore (Unix.kill !pid Sys.sigkill);
-    ignore (Unix.waitpid [] !pid);
-    p#button_stop#set_label "gtk-redo";
-    p#button_remove#misc#set_sensitive true;
-    if once then
-      remove_callback ()
-    else if stop && p#checkbutton_autolaunch#active then
-      callback false
-    | "gtk-redo", false ->
-    p#button_stop#set_label "gtk-stop";
-    run callback;
-    p#button_remove#misc#set_sensitive false
-    | _ -> ()
+        "gtk-stop", _ ->
+          List.iter Glib.Io.remove !watches;
+          close_in !outchan;
+          ignore (Unix.kill !pid Sys.sigkill);
+          begin match Unix.waitpid [] !pid with
+            | (x, Unix.WEXITED 0) ->
+              log (sprintf "\nDONE '%s'\n\n" com);
+            | (x, Unix.WEXITED i) ->
+              log (sprintf "\nFAILED '%s' with code %i\n\n" com i);
+            | (x, _) ->
+              log (sprintf "\nSTOPPED '%s'\n\n" com);
+          end;
+          p#button_stop#set_label "gtk-redo";
+          p#button_remove#misc#set_sensitive true;
+          if once then
+            remove_callback ()
+          else if stop && p#checkbutton_autolaunch#active then
+            callback false
+      | "gtk-redo", false ->
+        p#button_stop#set_label "gtk-stop";
+        run callback;
+        p#button_remove#misc#set_sensitive false
+      | _ -> ()
   in
   ignore (p#button_stop#connect#clicked ~callback:(fun () -> callback false));
   ignore (p#entry_program#connect#activate ~callback:(fun () -> callback false));
@@ -164,8 +163,8 @@ let command = fun ?file gui (log:string->unit) ac_name target ->
 
 let conf_is_set = fun home ->
   Sys.file_exists home &&
-  Sys.file_exists (home // "conf") &&
-  Sys.file_exists (home // "data")
+    Sys.file_exists (home // "conf") &&
+    Sys.file_exists (home // "data")
 
 let druid = fun home ->
   let w = GWindow.window ~title:"Configuring Paparazzi" () in
@@ -179,10 +178,10 @@ let druid = fun home ->
     fp#set_text (sprintf "Configuration files need to be installed in your Paparazzi home (%s). To use another directory, please exit this utility, set the PAPARAZZI_HOME variable to the desired folder and restart." home);
     d#append_page fp;
     ignore (fp#connect#next
-          (fun _ ->
-        basic_command prerr_endline "" "init";
-        false
-          ))
+              (fun _ ->
+                basic_command prerr_endline "" "init";
+                false
+              ))
 
   end;
 
@@ -192,10 +191,10 @@ let druid = fun home ->
     d#append_page ep ;
 
     ignore (ep#connect#finish
-          (fun _ ->
-        w#destroy ();
-        GMain.quit ()
-          ))
+              (fun _ ->
+                w#destroy ();
+                GMain.quit ()
+              ))
   end;
   w#show ();
   GMain.main ()

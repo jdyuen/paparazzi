@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2011 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -73,7 +71,7 @@ static inline void main_init( void ) {
 
 static inline void main_periodic_task( void ) {
 
-  if (cpu_time_sec > 1) imu_periodic();
+  if (sys_time.nb_sec > 1) imu_periodic();
   RunOnceEvery(10, { LED_PERIODIC();});
   main_report();
 }
@@ -161,16 +159,27 @@ static inline void main_report(void) {
 		       },
 		       {
 #ifdef USE_I2C2
-			 DOWNLINK_SEND_I2C_ERRORS(DefaultChannel, DefaultDevice,
-						  &i2c2.errors->ack_fail_cnt,
-						  &i2c2.errors->miss_start_stop_cnt,
-						  &i2c2.errors->arb_lost_cnt,
-						  &i2c2.errors->over_under_cnt,
-						  &i2c2.errors->pec_recep_cnt,
-						  &i2c2.errors->timeout_tlow_cnt,
-						  &i2c2.errors->smbus_alert_cnt,
-						  &i2c2.errors->unexpected_event_cnt,
-						  &i2c2.errors->last_unexpected_event);
+                 uint16_t i2c2_ack_fail_cnt          = i2c2.errors->ack_fail_cnt;
+                 uint16_t i2c2_miss_start_stop_cnt   = i2c2.errors->miss_start_stop_cnt;
+                 uint16_t i2c2_arb_lost_cnt          = i2c2.errors->arb_lost_cnt;
+                 uint16_t i2c2_over_under_cnt        = i2c2.errors->over_under_cnt;
+                 uint16_t i2c2_pec_recep_cnt         = i2c2.errors->pec_recep_cnt;
+                 uint16_t i2c2_timeout_tlow_cnt      = i2c2.errors->timeout_tlow_cnt;
+                 uint16_t i2c2_smbus_alert_cnt       = i2c2.errors->smbus_alert_cnt;
+                 uint16_t i2c2_unexpected_event_cnt  = i2c2.errors->unexpected_event_cnt;
+                 uint32_t i2c2_last_unexpected_event = i2c2.errors->last_unexpected_event;
+                 const uint8_t _bus2 = 2;
+                 DOWNLINK_SEND_I2C_ERRORS(DefaultChannel, DefaultDevice,
+                                          &i2c2_ack_fail_cnt,
+                                          &i2c2_miss_start_stop_cnt,
+                                          &i2c2_arb_lost_cnt,
+                                          &i2c2_over_under_cnt,
+                                          &i2c2_pec_recep_cnt,
+                                          &i2c2_timeout_tlow_cnt,
+                                          &i2c2_smbus_alert_cnt,
+                                          &i2c2_unexpected_event_cnt,
+                                          &i2c2_last_unexpected_event,
+                                          &_bus2);
 #endif
 		       },
 		       {

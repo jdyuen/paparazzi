@@ -1,6 +1,5 @@
 # Hey Emacs, this is a -*- makefile -*-
 #
-#   $Id$
 #   Copyright (C) 2009 Antoine Drouin
 #
 # This file is part of paparazzi.
@@ -108,7 +107,5 @@ $(OBJDIR)/.depend:
 	$(Q)$(CC) -MM -MG $(CFLAGS) $($(TARGET).CFLAGS) $($(TARGET).srcs) | sed 's|\([^\.]*\.o\)|$(OBJDIR)/\1|' > $@
 
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),erase)
 -include $(OBJDIR)/.depend
-endif
 endif

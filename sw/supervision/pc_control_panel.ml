@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Paparazzi center processes handling
  *
  * Copyright (C) 2007 ENAC, Pascal Brisset, Antoine Drouin
@@ -41,7 +39,11 @@ let programs =
 let program_command = fun x ->
   try
     let xml = Hashtbl.find programs x in
-    Env.paparazzi_src // ExtXml.attrib xml "command"
+    let cmd = ExtXml.attrib xml "command" in
+    if cmd.[0] = '/' then
+      cmd
+    else
+      Env.paparazzi_src // cmd
   with Not_found ->
     failwith (sprintf "Fatal Error: Program '%s' not found in control_panel.xml" x)
 
@@ -143,14 +145,41 @@ let double_quote = fun s ->
   else
     s
 
-let supervision = fun ?file gui log (ac_combo : Gtk_tools.combo) ->
+let get_simtype = fun (target_combo : Gtk_tools.combo) ->
+  (* get the list of possible targets *)
+  let targets = Gtk_tools.combo_values_list target_combo in
+  (* filter non simulator targets *)
+  let sim_targets = ["sim"; "jsbsim"; "nps"] in
+  let targets = List.filter (fun t -> List.mem t sim_targets) targets in
+  (* open question box and return corresponding simulator type *)
+  match targets with
+    [] -> "none"
+  | [t] -> t
+  | l ->
+      match GToolbox.question_box ~title:"Simulator type" ~buttons:l "Choose the simulator type:" with
+      | 0 -> "none"
+      | choice -> List.nth targets (choice-1)
+
+let supervision = fun ?file gui log (ac_combo : Gtk_tools.combo) (target_combo : Gtk_tools.combo) ->
   let run_gcs = fun () ->
     run_and_monitor ?file gui log "GCS" ""
   and run_server = fun args ->
     run_and_monitor ?file gui log "Server" args
-  and run_sitl = fun ac_name ->
-    let args = sprintf "-a %s -boot -norc" ac_name in
-    run_and_monitor ?file gui log "Simulator" args
+  and choose_and_run_sitl = fun ac_name ->
+    let get_args = fun simtype ac_name ->
+      match simtype with
+          "sim" -> sprintf "-a %s -t %s --boot --norc" ac_name simtype
+        | "jsbsim" -> sprintf "-a %s -t %s" ac_name simtype
+        | "nps" -> sprintf "-a %s -t %s" ac_name simtype
+        | _ -> "none"
+    in
+    let sim_type = get_simtype target_combo in
+    let args = get_args sim_type ac_name in
+    if args <> "none" then begin
+      run_and_monitor ?file gui log "Simulator" args;
+      run_and_monitor ?file gui log "GCS" "";
+      run_and_monitor ?file gui log "Server" "-n"
+    end
   in
 
   (* Sessions *)
@@ -198,9 +227,7 @@ let supervision = fun ?file gui log (ac_combo : Gtk_tools.combo) ->
 
   (* Simulations *)
   let simulation = fun () ->
-    run_gcs ();
-    run_server "-n";
-    run_sitl (Gtk_tools.combo_value ac_combo) in
+    choose_and_run_sitl (Gtk_tools.combo_value ac_combo) in
 
   (* Run session *)
   let callback = fun () ->

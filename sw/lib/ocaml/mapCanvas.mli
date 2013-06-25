@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Geographic display
  *
  * Copyright (C) 2004-2008 ENAC, Pascal Brisset, Antoine Drouin
@@ -45,6 +43,7 @@ class widget :
       float * float -> float -> float -> float -> GnoCanvas.line
     method background : GnoCanvas.group
     method background_event : GnoCanvas.item_event -> bool
+    method maps : GnoCanvas.group array
     method canvas : GnoCanvas.canvas
     method center : Latlong.geographic -> unit
     method circle :
@@ -59,6 +58,7 @@ class widget :
     method display_group : string -> unit
     method display_pixbuf :
       ?opacity:int ->
+      ?level:int ->
       (int * int) * Latlong.geographic ->
       (int * int) * Latlong.geographic -> GdkPixbuf.pixbuf -> GnoCanvas.pixbuf
     method display_xy : string -> unit
@@ -81,6 +81,12 @@ class widget :
     method of_world : Latlong.fmeter * Latlong.fmeter -> Latlong.geographic
     method pack_labels : unit
     method projection : string
+    method photoprojection :
+      ?group:GnoCanvas.group ->
+      ?width:int ->
+      ?fill_color:string ->
+      ?color:string ->
+      ?number:string -> Latlong.geographic -> Latlong.fmeter -> GnoCanvas.text
     method pt2D_of : Latlong.geographic -> Geometry_2d.pt_2D
     method region : ((float * float) * (Latlong.fmeter * Latlong.fmeter)) option
     method register_to_fit : geographic -> unit

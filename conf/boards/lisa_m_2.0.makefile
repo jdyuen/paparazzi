@@ -14,17 +14,17 @@ $(TARGET).ARCHDIR = $(ARCH)
 # not needed?
 $(TARGET).OOCD_INTERFACE=flossjtag
 #$(TARGET).OOCD_INTERFACE=jtagkey-tiny
+$(TARGET).LDSCRIPT=$(SRC_ARCH)/lisa-m.ld
 
 # -----------------------------------------------------------------------
 
-ifndef FLASH_MODE
-FLASH_MODE = DFU
-#FLASH_MODE = JTAG
-#FLASH_MODE = SERIAL
-endif
+# default flash mode is via usb dfu bootloader (luftboot)
+# other possibilities: JTAG, SWD, SERIAL
+FLASH_MODE ?= DFU
 
 ifndef NO_LUFTBOOT
-$(TARGET).LDSCRIPT = $(SRC_ARCH)/lisa_m_2.0_luftboot.ld
+$(TARGET).CFLAGS+=-DLUFTBOOT
+$(TARGET).LDFLAGS+=-Wl,-Ttext=0x8002000
 endif
 
 #
@@ -37,52 +37,35 @@ endif
 #
 # default LED configuration
 #
-ifndef RADIO_CONTROL_LED
-RADIO_CONTROL_LED  = 4
-endif
+RADIO_CONTROL_LED  ?= 4
+BARO_LED           ?= none
+AHRS_ALIGNER_LED   ?= 2
+GPS_LED            ?= 3
+SYS_TIME_LED       ?= 1
 
-ifndef BARO_LED
-BARO_LED = none
-endif
-
-ifndef AHRS_ALIGNER_LED
-AHRS_ALIGNER_LED = 2
-endif
-
-ifndef GPS_LED
-GPS_LED = 3
-endif
-
-ifndef SYS_TIME_LED
-SYS_TIME_LED = 1
-endif
 
 #
 # default uart configuration
 #
-ifndef RADIO_CONTROL_SPEKTRUM_PRIMARY_PORT
-RADIO_CONTROL_SPEKTRUM_PRIMARY_PORT   = UART1
-endif
+RADIO_CONTROL_SPEKTRUM_PRIMARY_PORT   ?= UART1
+RADIO_CONTROL_SPEKTRUM_SECONDARY_PORT ?= UART5
 
-ifndef RADIO_CONTROL_SPEKTRUM_SECONDARY_PORT
-RADIO_CONTROL_SPEKTRUM_SECONDARY_PORT = UART5
-endif
+MODEM_PORT ?= UART2
+MODEM_BAUD ?= B57600
 
-ifndef MODEM_PORT
-MODEM_PORT=UART2
-endif
-ifndef MODEM_BAUD
-MODEM_BAUD=B57600
-endif
+GPS_PORT ?= UART3
+GPS_BAUD ?= B38400
 
 
-ifndef GPS_PORT
-GPS_PORT=UART3
-endif
-ifndef GPS_BAUD
-GPS_BAUD=B38400
-endif
-
+#
+# default actuator configuration
+#
+# you can use different actuators by adding a configure option to your firmware section
+# e.g. <configure name="ACTUATORS" value="actuators_ppm/>
+# and by setting the correct "driver" attribute in servo section
+# e.g. <servo driver="Ppm">
+#
+ACTUATORS ?= actuators_pwm
 
 
 ifndef ADC_IR1
@@ -97,6 +80,4 @@ ifndef ADC_IR3
 ADC_IR_TOP      = 3
 ADC_IR_TOP_CHAN = 2
 endif
-ifndef ADC_IR_NB_SAMPLES
-ADC_IR_NB_SAMPLES = 16
-endif
+ADC_IR_NB_SAMPLES ?= 16

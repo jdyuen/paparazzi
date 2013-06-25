@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2005 Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -19,11 +17,12 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
- *
  */
 
-/** \file main_fbw.h
- *  \brief FBW ( FlyByWire ) process API
+/**
+ * @file firmwares/fixedwing/main_fbw.h
+ *
+ * FBW ( FlyByWire ) process API
  *
  */
 
@@ -36,7 +35,7 @@
 #define FBW_MODE_MANUAL   0
 #define FBW_MODE_AUTO     1
 #define FBW_MODE_FAILSAFE 2
-#define FBW_MODE_OF_PPRZ(mode) ((mode) < TRESHOLD_MANUAL_PPRZ ? FBW_MODE_MANUAL : FBW_MODE_AUTO)
+#define FBW_MODE_OF_PPRZ(mode) ((mode) < THRESHOLD_MANUAL_PPRZ ? FBW_MODE_MANUAL : FBW_MODE_AUTO)
 
 extern uint8_t fbw_mode;
 extern bool_t failsafe_mode;

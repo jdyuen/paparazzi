@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2010 The Paparazzi Team
  *
  * This file is part of Paparazzi.
@@ -26,9 +24,9 @@
 #include "mcu_periph/uart.h"
 #include "mcu_periph/sys_time.h"
 #include "subsystems/datalink/downlink.h"
-#include "firmwares/rotorcraft/commands.h"
-#include "actuators.h"
-#include "actuators/actuators_pwm.h"
+#include "subsystems/commands.h"
+#include "subsystems/actuators.h"
+#include "subsystems/actuators/actuators_pwm.h"
 #include "subsystems/imu.h"
 #include "subsystems/radio_control.h"
 #include "autopilot.h"

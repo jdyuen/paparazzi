@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * joystick lib
  *
  * based on Force Feedback: Constant Force Stress Test
@@ -63,7 +61,7 @@ struct stick_code_param_ {
 extern struct stick_code_param_ stick_init_param;
 
 /* Init: device_name = NULL for automatic search
- * return 1 if no joystick found 
+ * return 1 if no joystick found
  */
 extern int stick_init( char * device_name );
 

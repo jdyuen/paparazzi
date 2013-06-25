@@ -94,7 +94,7 @@
     <define name="NOMINAL_AIRSPEED" value="20." unit="m/s"/>
     <define name="CARROT" value="3." unit="s"/>
     <define name="KILL_MODE_DISTANCE" value="(1.5*MAX_DIST_FROM_HOME)"/>
-    <define name="CONTROL_RATE" value="60" unit="Hz"/>
+    <define name="CONTROL_FREQUENCY" value="60" unit="Hz"/>
 <!--    <define name="XBEE_INIT" value="\"ATPL2\rATRN1\rATTT80\r\""/> -->
     <define name="NO_XBEE_API_INIT" value="TRUE"/>
     <define name="ALT_KALMAN_ENABLED" value="TRUE"/>
@@ -157,7 +157,6 @@
   </section>
 
   <section name="NAV">
-    <define name="NAV_PITCH" value="0."/>
     <define name="NAV_GLIDE_PITCH_TRIM" value="(V_CTL_AUTO_THROTTLE_PITCH_OF_VZ_PGAIN*V_CTL_ALTITUDE_MAX_CLIMB)"/>
   </section>
 
@@ -205,10 +204,10 @@ ap.srcs += $(SRC_ARCH)/servos_4015_hw.c actuators.c
 ap.CFLAGS += -DRADIO_CONTROL
 ap.srcs += radio_control.c $(SRC_ARCH)/ppm_hw.c
 
-ap.CFLAGS += -DDOWNLINK -DUSE_UART0 -DDOWNLINK_TRANSPORT=XBeeTransport -DDOWNLINK_FBW_DEVICE=Uart0 -DDOWNLINK_AP_DEVICE=Uart0 -DXBEE_UART=Uart0 -DDATALINK=XBEE -DUART0_BAUD=B9600
+ap.CFLAGS += -DDOWNLINK -DUSE_UART0 -DDOWNLINK_TRANSPORT=XBeeTransport -DDOWNLINK_FBW_DEVICE=UART0 -DDOWNLINK_AP_DEVICE=UART0 -DXBEE_UART=UART0 -DDATALINK=XBEE -DUART0_BAUD=B9600
 ap.srcs += subsystems/datalink/downlink.c $(SRC_ARCH)/mcu_periph/uart_arch.c datalink.c subsystems/datalink/xbee.c
 
-#TRANSPARENT   ap.CFLAGS += -DDOWNLINK -DUSE_UART0 -DDOWNLINK_TRANSPORT=PprzTransport -DDOWNLINK_FBW_DEVICE=Uart0 -DDOWNLINK_AP_DEVICE=Uart0 -DPPRZ_UART=Uart0 -DDATALINK=PPRZ -DUART0_BAUD=B9600
+#TRANSPARENT   ap.CFLAGS += -DDOWNLINK -DUSE_UART0 -DDOWNLINK_TRANSPORT=PprzTransport -DDOWNLINK_FBW_DEVICE=UART0 -DDOWNLINK_AP_DEVICE=UART0 -DPPRZ_UART=UART0 -DDATALINK=PPRZ -DUART0_BAUD=B9600
 #TRANSPARENT ap.srcs += subsystems/datalink/downlink.c $(SRC_ARCH)/mcu_periph/uart_arch.c datalink.c subsystems/datalink/pprz_transport.c
 
 
@@ -218,7 +217,7 @@ ap.srcs += inter_mcu.c
 ap.CFLAGS += -DADC -DUSE_AD0 -DUSE_AD0_2 -DUSE_AD0_3 -DUSE_AD1 -DUSE_AD1_3 -DUSE_AD1_5 -DUSE_AD1_2 -DUSE_AD1_4
 ap.srcs += $(SRC_ARCH)/adc_hw.c
 
-ap.CFLAGS += -DUSE_GPS -DUBX -DUSE_UART1 -DGPS_LINK=Uart1 -DUART1_BAUD=B19200
+ap.CFLAGS += -DUSE_GPS -DUBX -DUSE_UART1 -DGPS_LINK=UART1 -DUART1_BAUD=B19200
 
 ap.srcs += gps_ubx.c gps.c
 

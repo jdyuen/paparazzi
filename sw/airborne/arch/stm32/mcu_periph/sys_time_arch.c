@@ -1,5 +1,4 @@
 /*
- *
  * Copyright (C) 2009-2011 The Paparazzi Team
  *
  * This file is part of paparazzi.
@@ -22,28 +21,40 @@
 
 /**
  * @file arch/stm32/mcu_periph/sys_time_arch.c
- * @brief STM32 timing functions.
+ * @ingroup stm32_arch
+ *
+ * STM32 timing functions.
  *
  */
 
 #include "mcu_periph/sys_time.h"
 
-#include "stm32_vector_table.h"
+#include "libopencm3/cm3/systick.h"
+
 #ifdef SYS_TIME_LED
 #include "led.h"
 #endif
 
-void sys_time_arch_init( void ) {
+void sys_tick_handler(void);
 
-  /* Generate SysTick interrupt every SYS_TIME_RESOLUTION_CPU_TICKS
-   * The timer interrupt is activated on the transition from 1 to 0,
+/** Initialize SysTick.
+ * Generate SysTick interrupt every sys_time.resolution_cpu_ticks
+ */
+void sys_time_arch_init( void ) {
+  /* run cortex systick timer with 72MHz */
+  systick_set_clocksource(STK_CTRL_CLKSOURCE_AHB);
+  sys_time.cpu_ticks_per_sec = AHB_CLK;
+
+  /* cpu ticks per desired sys_time timer step */
+  sys_time.resolution_cpu_ticks = (uint32_t)(sys_time.resolution * sys_time.cpu_ticks_per_sec + 0.5);
+
+  /* The timer interrupt is activated on the transition from 1 to 0,
    * therefore it activates every n+1 clock ticks.
    */
-  if (SysTick_Config(SYS_TIME_RESOLUTION_CPU_TICKS-1))
-    while(1); /* if reload of value is impossible, go into endless loop */
+  systick_set_reload(sys_time.resolution_cpu_ticks-1);
 
-  /* Set SysTick handler priority */
-  NVIC_SetPriority(SysTick_IRQn, 0x0);
+  systick_interrupt_enable();
+  systick_counter_enable();
 }
 
 
@@ -52,12 +63,11 @@ void sys_time_arch_init( void ) {
 // 97 days at 512hz
 // 12 hours at 100khz
 //
-void sys_tick_irq_handler(void) {
-
+void sys_tick_handler(void) {
   sys_time.nb_tick++;
-  sys_time.nb_sec_rem += SYS_TIME_RESOLUTION_CPU_TICKS;
-  if (sys_time.nb_sec_rem >= CPU_TICKS_PER_SEC) {
-    sys_time.nb_sec_rem -= CPU_TICKS_PER_SEC;
+  sys_time.nb_sec_rem += sys_time.resolution_cpu_ticks;
+  if (sys_time.nb_sec_rem >= sys_time.cpu_ticks_per_sec) {
+    sys_time.nb_sec_rem -= sys_time.cpu_ticks_per_sec;
     sys_time.nb_sec++;
 #ifdef SYS_TIME_LED
     LED_TOGGLE(SYS_TIME_LED);
@@ -65,10 +75,12 @@ void sys_tick_irq_handler(void) {
   }
   for (unsigned int i=0; i<SYS_TIME_NB_TIMER; i++) {
     if (sys_time.timer[i].in_use &&
-    sys_time.nb_tick >= sys_time.timer[i].end_time) {
+        sys_time.nb_tick >= sys_time.timer[i].end_time) {
       sys_time.timer[i].end_time += sys_time.timer[i].duration;
       sys_time.timer[i].elapsed = TRUE;
-      if (sys_time.timer[i].cb) sys_time.timer[i].cb(i);
+      if (sys_time.timer[i].cb) {
+        sys_time.timer[i].cb(i);
+      }
     }
   }
 }

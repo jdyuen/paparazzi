@@ -167,7 +167,6 @@
    <define name="RC_CLIMB_COEF" value ="163"/>
    <!-- SPEED_BFP_OF_REAL(1.5) * 20% -->
    <define name="RC_CLIMB_DEAD_BAND" value ="160000"/>
-   <!-- <define name="INV_M" value="0.118"/> -->
   </section>
 
 <section name="GUIDANCE_H" prefix="GUIDANCE_H_">
@@ -207,6 +206,7 @@
     <subsystem name="gps"           type="ublox"/>
     <subsystem name="stabilization"   type="euler"/>
     <subsystem name="ahrs"          type="int_cmpl_euler"/>
+    <subsystem name="ins"/>
 </firmware>
 <firmware name="booz_test_progs">
     <target name="test_telemetry" board="booz_1.0"/>

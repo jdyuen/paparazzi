@@ -1,0 +1,261 @@
+<!DOCTYPE airframe SYSTEM "../../airframe.dtd">
+
+<!-- UAP1-A : U of A UAS Group Unmanned Aircraft Platform 1 Configuration A
+     Hobby Lobby Senior Telemaster
+     Modified for removable bolt-on wing, tail servos; dual aileron servos
+     Evolution 26GX 2-stroke gas engine, electronic ignition w/ 2500mAh 2S Lipo
+     Spektrum DX-8 Transmitter, AR8000 Receiver w/ 1 Sat, Telemetry module
+     Servo and autopilot power from 4000mAh 2S Lipo with Castle Creations CCBEC @ 5V
+     SmartFly optical ignition cutoff module
+     PPM Encoder w/ Atmega168
+     PPZUAV TWOG V1 board
+     PPZUAV IR Sensors, Aligned IR Sensors
+     Digi XTend 900MHz radio modems (transparent serial)
+     PPZUAV Ublox LEA 5H GPS
+
+     Additional Notes:
+     -first configuration, based on twinstar_example.xml
+-->
+
+<airframe name="UAP1-A">
+
+<!-- Firmware Section -->
+  <firmware name="fixedwing">
+    <target name="ap" 			board="twog_1.0"/>
+    <target name="sim" 			board="pc"/>
+    <target name="jsbsim"		board="pc"/>
+
+    <define name="LOITER_TRIM"/>
+    <define name="ALT_KALMAN"/>
+    <define name="AGR_CLIMB"/>
+
+    <subsystem name="radio_control" type="ppm"/>
+    <subsystem name="telemetry"     type="transparent"/> <!-- default baud is 57600 -->
+    <subsystem name="control"/>
+    <subsystem name="attitude"      type="infrared"/>
+    <subsystem name="gps"           type="ublox"/>
+    <subsystem name="navigation"/>
+  </firmware>
+
+  <firmware name="setup">
+    <target name="tunnel" 		board="twog_1.0"/>
+    <target name="setup_actuators" 	board="twog_1.0"/>
+  </firmware>
+
+<!-- simulation section -->
+  <section name="SIMU">
+    <!-- for normal SITL sim -->
+    <define name="WEIGHT" value ="1."/>
+    <define name="YAW_RESPONSE_FACTOR" value ="1."/> <!-- adapts the aircraft's turn rate corresponding to a bank angle; a larger value increases the turn radius -->
+    <define name="ROLL_RESPONSE_FACTOR" value ="15."/> <!-- aileron efficiency; a higher value increases roll agility -->
+    <!-- for jsbsim -->
+    <define name="JSBSIM_MODEL" value="&quot;Rascal110-mod1&quot;"/>
+    <define name="JSBSIM_IR_ROLL_NEUTRAL" value="0." unit="deg"/>
+    <define name="JSBSIM_IR_PITCH_NEUTRAL" value="0." unit="deg"/>
+    <define name="JSBSIM_LAUNCHSPEED" value="15.0"/>
+    <define name="JSBSIM_INIT" value="&quot;Rascal110-IC&quot;"/>
+  </section>
+
+<!-- commands section -->
+  <servos>
+    <servo name="MOTOR"         no="4" min="1198" neutral="1198" max="1887"/> <!-- min and neutral typically the same -->
+    <servo name="AILERON_RIGHT"  no="3" min="1115" neutral="1504" max="1903"/>
+    <servo name="ELEVATOR"      no="7" min="1902" neutral="1506" max="1115"/>
+    <servo name="RUDDER"        no="6" min="1115" neutral="1509" max="1902"/>
+    <servo name="AILERON_LEFT" no="2" min="1115" neutral="1504" max="1903"/>
+    <servo name="IGN_CUT"	       no="0" min="1115" neutral="1508" max="1903"/>
+    <!-- <servo name="CAM_PITCH"     no="1" min="1000" neutral="1500" max="2000"/> -->
+    <!-- <servo name="CAM_ROLL"      no="5" min="1000" neutral="1500" max="2000"/> -->
+  </servos>
+
+<!-- commands, failsafe_value range: [-9600:9600], [0:9600] for throttle -->
+<!-- these failsafe values are what is driven when no input to servos from either r/c or autopilot control loops
+     is present, results in locked servos, i.e. at bootup -->
+  <commands>
+    <axis name="THROTTLE"  failsafe_value="0"/>
+    <axis name="ROLL"      failsafe_value="0"/>
+    <axis name="PITCH"     failsafe_value="0"/>
+    <axis name="YAW"       failsafe_value="0"/>
+    <axis name="IGNCUT"    failsafe_value="-9000"/>  <!-- SET THIS UP!!! -->
+  </commands>
+
+<!-- links radio file definitions to commands in r/c mode -->
+  <rc_commands>
+    <set command="THROTTLE" value="@THROTTLE"/>
+    <set command="ROLL"     value="@ROLL"/>
+    <set command="PITCH"    value="@PITCH"/>
+    <set command="YAW"      value="@YAW"/>
+    <set command="IGNCUT"   value="@IGNCUT"/>
+  </rc_commands>
+
+<!-- commands that remain under r/c control even in auto -->
+  <auto_rc_commands>
+    <set command="IGNCUT" value="@IGNCUT"/>
+    <set command="YAW" value="@YAW"/> <!-- to disable r/c rudder in auto, use empty section -->
+  </auto_rc_commands>
+
+<!-- commands that remain under auto control even in r/c -->
+  <ap_only_commands>
+    <!-- <copy command="PAN"/> -->
+    <!-- <copy command="TILT"/> -->
+  </ap_only_commands>
+
+  <section name="MIXER">
+    <define name="AILERON_DIFF" value="0.8"/>
+  </section>
+
+<!-- links commands to servos -->
+  <command_laws>
+    <set servo="MOTOR" value="@THROTTLE"/>
+    <set servo="ELEVATOR" value="@PITCH"/>
+    <let var="roll" value="@ROLL"/>
+    <set servo="AILERON_LEFT" value="($roll > 0 ? 1 : AILERON_DIFF) * $roll"/>
+    <set servo="AILERON_RIGHT" value="($roll > 0 ? AILERON_DIFF : 1) * $roll"/>
+    <set servo="RUDDER" value="@YAW"/> <!-- may want to mix with aileron or write new control loop(s) -->
+    <set servo="IGN_CUT" value="@IGNCUT"/>
+    <!-- <set servo="CAM_ROLL" value="@CAM_ROLL"/> -->
+    <!-- <set servo="CAM_PITCH" value="@CAM_PITCH"/> -->
+  </command_laws>
+
+<!-- with this failsafe section inner stabilization loops still active -->
+  <section name="FAILSAFE" prefix="FAILSAFE_">
+    <define name="DELAY_WITHOUT_GPS" value="2" unit="s"/>
+    <define name="DEFAULT_THROTTLE" value="0.3" unit="%"/>
+    <define name="DEFAULT_ROLL" value="10.0" unit="deg"/>
+    <define name="DEFAULT_PITCH" value="5.0" unit="deg"/>
+    <define name="HOME_RADIUS" value="100" unit="m"/>
+  </section>
+
+  <section name="AUTO1" prefix="AUTO1_">
+    <define name="MAX_ROLL" value="35.0" unit="deg"/>
+    <define name="MAX_PITCH" value="25.0" unit="deg"/>
+  </section>
+
+  <section name="INFRARED" prefix="IR_">
+    <define name="ADC_IR1_NEUTRAL" value="512"/> <!-- obtained from calibration -->
+    <define name="ADC_IR2_NEUTRAL" value="512"/> 
+    <define name="ADC_TOP_NEUTRAL" value="512"/>
+
+    <define name="HORIZ_SENSOR_ALIGNED" value="1"/>
+    <define name="IR1_SIGN" value="1"/> <!-- horiz sensor must give (+) when temp to right and rear higher-->
+    <define name="IR2_SIGN" value="1"/>
+    <define name="TOP_SIGN" value="1"/> <!-- vert sensor must give (+) when temp below higher than temp above -->
+
+    <!-- used to scale to ensure similar contrast in all axes, default 1. -->
+    <define name="LATERAL_CORRECTION" value="1."/>
+    <define name="LONGITUDINAL_CORRECTION" value="1."/>
+    <define name="VERTICAL_CORRECTION" value="1."/>
+
+    <!-- tune these in flight to counter alignment issues with mounting horiz sensor -->
+    <define name="ROLL_NEUTRAL_DEFAULT" value="0.0" unit="deg"/>
+    <define name="PITCH_NEUTRAL_DEFAULT" value="0.0" unit="deg"/>
+
+    <!-- used for asymmetric correction, i.e. if up is 20deg and down is 15deg, scale one or the other to match actual -->
+    <define name="CORRECTION_UP" value="1."/>
+    <define name="CORRECTION_DOWN" value="1."/>
+    <define name="CORRECTION_LEFT" value="1."/>
+    <define name="CORRECTION_RIGHT" value="1."/>
+  </section>
+
+  <section name="BAT">
+    <define name="MILLIAMP_AT_FULL_THROTTLE" value="20000" unit="mA"/> <!-- use this to estimate fuel level? -->
+    <define name="CURRENT_ESTIMATION_NONLINEARITY" value="1.2"/> <!-- superellipse non-linearity adjustment for current (fuel?) draw -->
+    <define name="CATASTROPHIC_BAT_LEVEL" value="6.3" unit="V"/>
+    <define name="CRITIC_BAT_LEVEL" value="6.8" unit="V"/>
+    <define name="LOW_BAT_LEVEL" value="7.2" unit="V"/>
+    <define name="MAX_BAT_LEVEL" value="8.4" unit="V"/>
+    <!-- <define name="VOLTAGE_ADC_A" value="0.0177531"/> -->
+    <!-- <define name="VOLTAGE_ADC_B" value="0.173626"/> -->
+    <!-- <define name="VoltageOfAdc(adc)" value ="(VOLTAGE_ADC_A * adc + VOLTAGE_ADC_B)"/> -->
+  </section>
+
+  <section name="MISC">
+    <define name="MINIMUM_AIRSPEED" value="10." unit="m/s"/>
+    <define name="NOMINAL_AIRSPEED" value="16." unit="m/s"/> <!-- mainly used in simulator -->
+    <define name="MAXIMUM_AIRSPEED" value="22." unit="m/s"/>
+    <define name="CARROT" value="5." unit="s"/>
+    <define name="KILL_MODE_DISTANCE" value="(1.5*MAX_DIST_FROM_HOME)"/>
+    <define name="CONTROL_RATE" value="60" unit="Hz"/>
+    <define name="ALT_KALMAN_ENABLED" value="TRUE"/>
+    <define name="DEFAULT_CIRCLE_RADIUS" value="120."/>
+
+    <!-- <define name="GLIDE_AIRSPEED" value="10"/> -->
+    <!-- <define name="GLIDE_VSPEED" value="3."/> -->
+    <!-- <define name="GLIDE_PITCH" value="45" unit="deg"/> -->
+  </section>
+
+
+  <section name="VERTICAL CONTROL" prefix="V_CTL_">
+    <define name="POWER_CTL_BAT_NOMINAL" value="7.4" unit="volt"/> <!-- ?? -->
+    <!-- Altitude loop: outer stage of vert control -->
+    <!-- outer loop proportional gain -->
+    <define name="ALTITUDE_PGAIN" value="-0.06"/>
+    <!-- outer loop saturation -->
+    <define name="ALTITUDE_MAX_CLIMB" value="2."/>
+
+    <!-- auto throttle inner loop -->
+    <define name="AUTO_THROTTLE_NOMINAL_CRUISE_THROTTLE" value="0.45"/> <!-- these all together make AUTO_THROTTLE_CRUISE_THROTTLE? -->
+    <define name="AUTO_THROTTLE_MIN_CRUISE_THROTTLE" value="0.25"/>
+    <define name="AUTO_THROTTLE_MAX_CRUISE_THROTTLE" value="0.85"/>
+    <define name="AUTO_THROTTLE_LOITER_TRIM" value="1000"/> <!-- ?? -->
+    <define name="AUTO_THROTTLE_DASH_TRIM" value="-1200"/> <!-- ?? -->
+    <define name="AUTO_THROTTLE_CLIMB_THROTTLE_INCREMENT" value="0.2" unit="%/(m/s)"/>
+    <define name="AUTO_THROTTLE_PGAIN" value="-0.023"/>
+    <define name="AUTO_THROTTLE_IGAIN" value="0.1"/>
+    <!-- <define name="AUTO_THROTTLE_DGAIN" value="0.0"/> -->
+    <define name="AUTO_THROTTLE_PITCH_OF_VZ_PGAIN" value="0.05"/>
+
+    <!-- auto pitch inner loop: climb loop: intermediate vert control stage; guidance_v.c -->
+    <define name="AUTO_PITCH_PGAIN" value="-0.06"/>
+    <define name="AUTO_PITCH_IGAIN" value="0.0"/>
+    <define name="AUTO_PITCH_MAX_PITCH" value="20.0" unit="deg"/>
+    <define name="AUTO_PITCH_MIN_PITCH" value="-20.0" unit="deg"/>
+
+    <define name="THROTTLE_SLEW_LIMITER" value="3" unit="s"/> <!-- min time from 0 to 100% throttle -->
+  </section>
+
+
+  <section name="HORIZONTAL CONTROL" prefix="H_CTL_"> <!-- found in stabilization_attitude.c -->
+    <!-- Course loop: upper stage of horiz control -->
+    <define name="COURSE_PGAIN" value="-1.0"/>
+    <!-- <define name="SPEED_DEPEND_NAV" value="??"/> --> <!-- multiplied with COURSE_PGAIN?? -->
+    <!-- <define name="COURSE_DGAIN" value="0.0"/> -->
+    <!-- <define name="COURSE_PRE_BANK_CORRECTION" value="??"/> -->
+    <define name="ROLL_MAX_SETPOINT" value="35.0" unit="deg"/>
+    <define name="PITCH_MAX_SETPOINT" value="30.0" unit="deg"/>
+    <define name="PITCH_MIN_SETPOINT" value="-30.0" unit="deg"/>
+
+    <!-- Roll loop: lower stage of horiz control, used for lateral attitude stabilization -->
+    <define name="ROLL_PGAIN" value="6000."/>
+    <!-- <define name="ROLL_ATTITUDE_GAIN" value="??"/> --> <!-- if not defined, falls back to ROLL_PGAIN attitude only loop -->
+    <!-- <define name="ROLL_RATE_GAIN" value="??"/> -->
+    <define name="AILERON_OF_THROTTLE" value="0.0"/>
+
+    <!-- Pitch loop: lower stage of vert control, used for longitudinal attitude stabilization -->
+    <define name="PITCH_PGAIN" value="-9000."/>
+    <define name="PITCH_DGAIN" value="-1700."/>
+    <define name="ELEVATOR_OF_ROLL" value="1500"/>
+  </section>
+
+  <section name="NAV">
+    <define name="NAV_PITCH" value="0." unit="deg"/>
+    <define name="NAV_GLIDE_PITCH_TRIM" value="0"/>
+  </section>
+
+  <section name="AGGRESSIVE" prefix="AGR_">
+    <define name="BLEND_START" value="50"/> <!-- Altitude Error to Initiate Aggressive Climb CANNOT BE ZERO!!-->
+    <define name="BLEND_END" value="15"/> <!-- Altitude Error to Blend Aggressive to Regular Climb Modes  CANNOT BE ZERO!!-->
+    <define name="CLIMB_THROTTLE" value="0.9"/> <!-- Gaz for Aggressive Climb -->
+    <define name="CLIMB_PITCH" value="20.0" unit="deg"/> <!-- Pitch for Aggressive Climb -->
+    <define name="DESCENT_THROTTLE" value="0.05"/> <!-- Gaz for Aggressive Decent -->
+    <define name="DESCENT_PITCH" value="-20.0" unit="deg"/> <!-- Pitch for Aggressive Decent -->
+    <define name="CLIMB_NAV_RATIO" value="0.8"/> <!-- Percent Navigation for Altitude Error Equal to Start Altitude -->
+    <define name="DESCENT_NAV_RATIO" value="1.0"/>
+  </section>
+
+<!--
+  <modules main_freq="60">
+    <load name="demo_module.xml"/>
+  </modules>
+-->
+</airframe>

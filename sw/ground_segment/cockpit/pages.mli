@@ -1,6 +1,4 @@
 (*
-* $Id$
-*
 * Widgets of the aircraft notebook
 *
 * Copyright (C) 2004-2006 ENAC, Pascal Brisset, Antoine Drouin
@@ -61,5 +59,15 @@ class rc_settings :
     method set_rc_mode : rc_mode -> unit
     method set_rc_setting_mode : rc_setting_mode -> unit
     method widget : GObj.widget
+  end
+
+type link_change = Linkup | Nochange | Linkdown
+class link : ?visible:(GBin.frame -> bool) -> GBin.frame ->
+  object
+    method link_exists : int -> bool
+    method add_link : int -> unit
+    method update_link : int -> float -> float -> float -> link_change
+    method links_ratio : unit -> (int * int)
+    method multiple_links : unit -> bool
   end
 

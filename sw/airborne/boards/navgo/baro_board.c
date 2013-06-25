@@ -33,19 +33,18 @@
 struct Baro baro;
 
 /* Counter to init mcp355x at startup */
-#define STARTUP_COUNTER 200
+#define BARO_STARTUP_COUNTER 200
 uint16_t startup_cnt;
 
 void baro_init( void ) {
   mcp355x_init();
-  SpiSelectSlave0(); // never unselect this slave (continious conversion mode)
   baro.status = BS_UNINITIALIZED;
   baro.absolute     = 0;
   baro.differential = 0; /* not handled on this board */
 #ifdef ROTORCRAFT_BARO_LED
   LED_OFF(ROTORCRAFT_BARO_LED);
 #endif
-  startup_cnt = STARTUP_COUNTER;
+  startup_cnt = BARO_STARTUP_COUNTER;
 }
 
 void baro_periodic( void ) {

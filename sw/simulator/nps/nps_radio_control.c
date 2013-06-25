@@ -1,3 +1,24 @@
+/*
+ * Copyright (C) 2009 Antoine Drouin <poinix@gmail.com>
+ *
+ * This file is part of paparazzi.
+ *
+ * paparazzi is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * paparazzi is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with paparazzi; see the file COPYING.  If not, write to
+ * the Free Software Foundation, 59 Temple Place - Suite 330,
+ * Boston, MA 02111-1307, USA.
+ */
+
 #include "nps_radio_control.h"
 
 #include "nps_radio_control_spektrum.h"
@@ -55,18 +76,22 @@ static rc_script scripts[] = {
 bool_t nps_radio_control_available(double time) {
   if (time >=  nps_radio_control.next_update) {
     nps_radio_control.next_update += RADIO_CONTROL_DT;
-    if (time < RADIO_CONTROL_TAKEOFF_TIME)
-      radio_control_script_takeoff(time);
-    else if (nps_radio_control.type == SCRIPT)
-      scripts[nps_radio_control.num_script](time);
-    else if (nps_radio_control.type == JOYSTICK) {
+
+    if (nps_radio_control.type == JOYSTICK) {
+      nps_radio_control_joystick_update();
       nps_radio_control.throttle = nps_joystick.throttle;
       nps_radio_control.roll = nps_joystick.roll;
       nps_radio_control.pitch = nps_joystick.pitch;
       nps_radio_control.yaw = nps_joystick.yaw;
       nps_radio_control.mode = nps_joystick.mode;
       //printf("throttle: %f, roll: %f, pitch: %f, yaw: %f\n", nps_joystick.throttle, nps_joystick.roll, nps_joystick.pitch, nps_joystick.yaw);
-    }
+    } else
+      if (nps_radio_control.type == SCRIPT) {
+        if (time < RADIO_CONTROL_TAKEOFF_TIME)
+          radio_control_script_takeoff(time);
+        else
+          scripts[nps_radio_control.num_script](time);
+      }
     return TRUE;
   }
   return FALSE;

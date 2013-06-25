@@ -1,6 +1,4 @@
 /*
- * $Id: $
- *
  * Copyright (C) 2010 Flixr
  *
  * This file is part of paparazzi.
@@ -26,6 +24,7 @@
 
 #include "std.h"
 #include "paparazzi.h"
+#include "generated/airframe.h"
 
 extern bool_t servo_switch_on;
 extern int16_t servo_switch_value;
@@ -37,7 +36,7 @@ extern int16_t servo_switch_value;
 #define SERVO_SWITCH_OFF_VALUE 1000
 #endif
 #ifndef SERVO_SWITCH_SERVO
-#define SERVO_SWITCH_SERVO SERVO_SWITCH
+#define SERVO_SWITCH_SERVO SWITCH
 #endif
 
 

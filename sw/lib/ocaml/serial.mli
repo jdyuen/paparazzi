@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * Serial Port handling
  *
  * Copyright (C) 2004 CENA/ENAC, Pascal Brisset
@@ -49,7 +47,7 @@ type speed =
 
 val speed_of_baudrate : string -> speed
 
-val opendev : string -> speed -> Unix.file_descr
+val opendev : string -> speed -> bool -> Unix.file_descr
 val close : Unix.file_descr -> unit
 val set_dtr : Unix.file_descr -> bool -> unit
 val set_speed : Unix.file_descr -> speed -> unit

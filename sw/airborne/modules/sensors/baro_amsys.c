@@ -25,7 +25,7 @@
 
 #include "sensors/baro_amsys.h"
 #include "mcu_periph/i2c.h"
-#include "estimator.h"
+#include "state.h"
 #include <math.h>
 #include "generated/flight_plan.h" // for ground alt
 
@@ -43,10 +43,10 @@
 #endif
 
 #ifdef SITL
-#include "gps.h"
+#include "subsystems/gps.h"
 #endif
 
-#define BARO_AMSYS_ADDR 0xF2
+#define BARO_AMSYS_ADDR 0xE4
 #define BARO_AMSYS_REG 0x07
 #define BARO_AMSYS_SCALE 0.32
 #define BARO_AMSYS_MAX_PRESSURE 103400 // Pascal
@@ -72,6 +72,7 @@
 // Global variables
 uint16_t pBaroRaw;
 uint16_t tBaroRaw;
+uint16_t baro_amsys_adc;
 float baro_amsys_offset;
 bool_t baro_amsys_valid;
 float baro_amsys_altitude;
@@ -118,16 +119,16 @@ void baro_amsys_read_periodic( void ) {
 #ifndef SITL
 	if (baro_amsys_i2c_trans.status == I2CTransDone){
 #ifndef MEASURE_AMSYS_TEMPERATURE
-	I2CReceive(BARO_AMSYS_I2C_DEV, baro_amsys_i2c_trans, BARO_AMSYS_ADDR, 2);
+	i2c_receive(&BARO_AMSYS_I2C_DEV, &baro_amsys_i2c_trans, BARO_AMSYS_ADDR, 2);
 #else
-	I2CReceive(BARO_AMSYS_I2C_DEV, baro_amsys_i2c_trans, BARO_AMSYS_ADDR, 4);
+	i2c_receive(&BARO_AMSYS_I2C_DEV, &baro_amsys_i2c_trans, BARO_AMSYS_ADDR, 4);
 #endif
 		}
 #else // SITL
 	pBaroRaw = 0;
 	baro_amsys_altitude = gps.hmsl / 1000.0;
+  baro_amsys_adc = baro_amsys_altitude / BARO_AMSYS_SCALE;
 	baro_amsys_valid = TRUE;
-	EstimatorSetAlt(baro_amsys_altitude);
 #endif
 }
 
@@ -145,6 +146,7 @@ void baro_amsys_read_event( void ) {
 	else
 		baro_amsys_valid = TRUE;
 
+  baro_amsys_adc = pBaroRaw;
 
 	// Continue only if a new altimeter value was received
 	//if (baro_amsys_valid && GpsFixValid()) {
@@ -180,10 +182,7 @@ void baro_amsys_read_event( void ) {
 			// Lowpassfiltering and convert pressure to altitude
 			baro_amsys_altitude = baro_filter * baro_old + (1 - baro_filter) * (baro_amsys_offset-baro_amsys_p)/(1.2041*9.81);
 			baro_old = baro_amsys_altitude;
-
-
 			//New value available
-			//EstimatorSetAlt(baro_amsys_abs_altitude);
 		}
 		baro_amsys_abs_altitude=baro_amsys_altitude+ref_alt_init;
 	} /*else {

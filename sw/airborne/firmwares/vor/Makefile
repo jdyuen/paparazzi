@@ -1,4 +1,7 @@
-all: 
+# Quiet compilation
+Q=@
+
+all:
 
 CFLAGS = -Wall -I..
 LDFLAGS = -lm
@@ -25,7 +28,7 @@ play_audio: sndfile-play.c
 	gcc $(CFLAGS) $^ -o $@ $(LDFLAGS)  -lsndfile -lasound
 
 clean:
-	rm -f i86_vor_test_float_demod \
+	$(Q)rm -f i86_vor_test_float_demod \
               i86_vor_test_int_demod   \
               i86_vor_test_filters     \
               *~ \#*

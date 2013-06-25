@@ -36,16 +36,26 @@ static void on_DL_MOVE_WP(IvyClientPtr app __attribute__ ((unused)),
                           void *user_data __attribute__ ((unused)),
                           int argc __attribute__ ((unused)), char *argv[]);
 
-void nps_ivy_init(void) {
+void nps_ivy_init(char* ivy_bus) {
   const char* agent_name = AIRFRAME_NAME"_NPS";
   const char* ready_msg = AIRFRAME_NAME"_NPS Ready";
   IvyInit(agent_name, ready_msg, NULL, NULL, NULL, NULL);
   IvyBindMsg(on_DL_PING, NULL, "^(\\S*) DL_PING");
   IvyBindMsg(on_DL_SETTING, NULL, "^(\\S*) DL_SETTING (\\S*) (\\S*) (\\S*)");
-  IvyBindMsg(on_DL_GET_SETTING, NULL, "^(\\S*) DL_GET_SETTING (\\S*) (\\S*)");
+  IvyBindMsg(on_DL_GET_SETTING, NULL, "^(\\S*) GET_DL_SETTING (\\S*) (\\S*)");
   IvyBindMsg(on_DL_BLOCK, NULL,   "^(\\S*) BLOCK (\\S*) (\\S*)");
   IvyBindMsg(on_DL_MOVE_WP, NULL, "^(\\S*) MOVE_WP (\\S*) (\\S*) (\\S*) (\\S*) (\\S*)");
-  IvyStart("127.255.255.255");
+
+#ifdef __APPLE__
+  const char* default_ivy_bus = "224.255.255.255";
+#else
+  const char* default_ivy_bus = "127.255.255.255";
+#endif
+  if (ivy_bus == NULL) {
+    IvyStart(default_ivy_bus);
+  } else {
+    IvyStart(ivy_bus);
+  }
 }
 
 //TODO use datalink parsing from booz or fw instead of doing it here explicitly
@@ -97,7 +107,7 @@ static void on_DL_MOVE_WP(IvyClientPtr app __attribute__ ((unused)),
   struct EnuCoor_i enu;
   lla.lat = INT32_RAD_OF_DEG(atoi(argv[3]));
   lla.lon = INT32_RAD_OF_DEG(atoi(argv[4]));
-  lla.alt = atoi(argv[5]) - ins_ltp_def.hmsl + ins_ltp_def.lla.alt;
+  lla.alt = atoi(argv[5])*10 - ins_ltp_def.hmsl + ins_ltp_def.lla.alt;
   enu_of_lla_point_i(&enu,&ins_ltp_def,&lla);
   enu.x = POS_BFP_OF_REAL(enu.x)/100;
   enu.y = POS_BFP_OF_REAL(enu.y)/100;
@@ -109,23 +119,15 @@ static void on_DL_MOVE_WP(IvyClientPtr app __attribute__ ((unused)),
 
 
 void nps_ivy_display(void) {
-  /*
-    IvySendMsg("%d COMMANDS %f %f %f %f",
-    AC_ID,
-    autopilot.commands[SERVO_FRONT],
-    autopilot.commands[SERVO_BACK],
-    autopilot.commands[SERVO_RIGHT],
-    autopilot.commands[SERVO_LEFT]);
-  */
-  IvySendMsg("%d BOOZ_SIM_RATE_ATTITUDE %f %f %f %f %f %f",
-	     AC_ID,
-	     DegOfRad(fdm.body_ecef_rotvel.p),
-	     DegOfRad(fdm.body_ecef_rotvel.q),
-	     DegOfRad(fdm.body_ecef_rotvel.r),
-	     DegOfRad(fdm.ltp_to_body_eulers.phi),
-	     DegOfRad(fdm.ltp_to_body_eulers.theta),
-	     DegOfRad(fdm.ltp_to_body_eulers.psi));
-  IvySendMsg("%d BOOZ_SIM_POS_LLH %f %f %f %f %f %f %f %f %f",
+  IvySendMsg("%d NPS_RATE_ATTITUDE %f %f %f %f %f %f",
+             AC_ID,
+             DegOfRad(fdm.body_ecef_rotvel.p),
+             DegOfRad(fdm.body_ecef_rotvel.q),
+             DegOfRad(fdm.body_ecef_rotvel.r),
+             DegOfRad(fdm.ltp_to_body_eulers.phi),
+             DegOfRad(fdm.ltp_to_body_eulers.theta),
+             DegOfRad(fdm.ltp_to_body_eulers.psi));
+  IvySendMsg("%d NPS_POS_LLH %f %f %f %f %f %f %f %f %f",
              AC_ID,
              (fdm.lla_pos_pprz.lat),
              (fdm.lla_pos_geod.lat),
@@ -136,28 +138,28 @@ void nps_ivy_display(void) {
              (fdm.lla_pos_geod.alt),
              (fdm.agl),
              (fdm.hmsl));
-  IvySendMsg("%d BOOZ_SIM_SPEED_POS %f %f %f %f %f %f %f %f %f",
-	     AC_ID,
-	     (fdm.ltpprz_ecef_accel.x),
-	     (fdm.ltpprz_ecef_accel.y),
-	     (fdm.ltpprz_ecef_accel.z),
-	     (fdm.ltpprz_ecef_vel.x),
-	     (fdm.ltpprz_ecef_vel.y),
-	     (fdm.ltpprz_ecef_vel.z),
-	     (fdm.ltpprz_pos.x),
-	     (fdm.ltpprz_pos.y),
-	     (fdm.ltpprz_pos.z));
-  IvySendMsg("%d BOOZ_SIM_GYRO_BIAS %f %f %f",
-         AC_ID,
-         DegOfRad(RATE_FLOAT_OF_BFP(sensors.gyro.bias_random_walk_value.x)+sensors.gyro.bias_initial.x),
-         DegOfRad(RATE_FLOAT_OF_BFP(sensors.gyro.bias_random_walk_value.y)+sensors.gyro.bias_initial.y),
-         DegOfRad(RATE_FLOAT_OF_BFP(sensors.gyro.bias_random_walk_value.z)+sensors.gyro.bias_initial.z));
+  IvySendMsg("%d NPS_SPEED_POS %f %f %f %f %f %f %f %f %f",
+             AC_ID,
+             (fdm.ltpprz_ecef_accel.x),
+             (fdm.ltpprz_ecef_accel.y),
+             (fdm.ltpprz_ecef_accel.z),
+             (fdm.ltpprz_ecef_vel.x),
+             (fdm.ltpprz_ecef_vel.y),
+             (fdm.ltpprz_ecef_vel.z),
+             (fdm.ltpprz_pos.x),
+             (fdm.ltpprz_pos.y),
+             (fdm.ltpprz_pos.z));
+  IvySendMsg("%d NPS_GYRO_BIAS %f %f %f",
+             AC_ID,
+             DegOfRad(RATE_FLOAT_OF_BFP(sensors.gyro.bias_random_walk_value.x)+sensors.gyro.bias_initial.x),
+             DegOfRad(RATE_FLOAT_OF_BFP(sensors.gyro.bias_random_walk_value.y)+sensors.gyro.bias_initial.y),
+             DegOfRad(RATE_FLOAT_OF_BFP(sensors.gyro.bias_random_walk_value.z)+sensors.gyro.bias_initial.z));
 
   /* transform magnetic field to body frame */
   struct DoubleVect3 h_body;
   FLOAT_QUAT_VMULT(h_body, fdm.ltp_to_body_quat, fdm.ltp_h);
 
-  IvySendMsg("%d BOOZ_SIM_SENSORS_SCALED %f %f %f %f %f %f",
+  IvySendMsg("%d NPS_SENSORS_SCALED %f %f %f %f %f %f",
          AC_ID,
          ((sensors.accel.value.x - sensors.accel.neutral.x)/NPS_ACCEL_SENSITIVITY_XX),
          ((sensors.accel.value.y - sensors.accel.neutral.y)/NPS_ACCEL_SENSITIVITY_YY),

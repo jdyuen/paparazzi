@@ -54,6 +54,15 @@
 
 /* ADC */
 
+/* not compatible with PWM1 */
+#define ADC_0 AdcBank1(6)
+#ifdef USE_ADC_0
+#ifndef USE_AD1
+#define USE_AD1
+#endif
+#define USE_AD1_6
+#endif
+
 /* battery */
 /* allow to define ADC_CHANNEL_VSUPPLY in the airframe file*/
 #ifndef ADC_CHANNEL_VSUPPLY
@@ -69,6 +78,9 @@
 /* SPI (SSP) */
 #define SPI_SELECT_SLAVE0_PORT 0
 #define SPI_SELECT_SLAVE0_PIN 20
+#define SPI_SELECT_SLAVE0_PINSEL PINSEL1
+#define SPI_SELECT_SLAVE0_PINSEL_BIT 8
+#define SPI_SELECT_SLAVE0_PINSEL_VAL 0
 
 //#define SPI_SELECT_SLAVE1_PORT 1
 //#define SPI_SELECT_SLAVE1_PIN 19
@@ -79,17 +91,19 @@
 #define SPI1_DRDY_EINT         0
 #define SPI1_DRDY_VIC_IT       VIC_EINT0
 
-/* PWM0 (internal PWM5) */
-/* P0.21 */
-#define PWM0_PINSEL PINSEL1
-#define PWM0_PINSEL_VAL 0x01
-#define PWM0_PINSEL_BIT 10
+/* Servo definition for actruators_pwm driver */
 
-/* PWM1 (internal PWM2 */
-/* P0.7 */
-#define PWM1_PINSEL PINSEL0
-#define PWM1_PINSEL_VAL 0x02
-#define PWM1_PINSEL_BIT 14
+/* NAVGO PWM0 = PWM_SERVO_2 (driver) = PWM2 (lpc) */
+#if USE_PWM0
+#define PWM_SERVO_2 1
+#define SERVO_REG_0 PWMMR2
+#endif
+
+/* NAVGO PWM1 = PWM_SERVO_5 (driver) = PWM5 (lpc) */
+#if USE_PWM1
+#define PWM_SERVO_5 1
+#define SERVO_REG_1 PWMMR5
+#endif
 
 #define BOARD_HAS_BARO 1
 

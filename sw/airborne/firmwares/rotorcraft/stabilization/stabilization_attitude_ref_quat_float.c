@@ -1,6 +1,4 @@
 /*
- * $Id$
- *
  * Copyright (C) 2008-2009 Antoine Drouin <poinix@gmail.com>
  *
  * This file is part of paparazzi.
@@ -21,20 +19,23 @@
  * Boston, MA 02111-1307, USA.
  */
 
-/** \file stabilization_attitude_ref_float.c
- *  \brief Booz attitude reference generation (quaternion float version)
+/**
+ * @file firmwares/rotorcraft/stabilization/stabilization_attitude_ref_quat_float.c
+ *
+ * Rotorcraft attitude reference generation.
+ * (quaternion float version)
  *
  */
 
 #include "generated/airframe.h"
 #include "firmwares/rotorcraft/stabilization.h"
-#include "subsystems/ahrs.h"
+#include "state.h"
 
 #include "stabilization_attitude_ref_float.h"
 
-#define REF_ACCEL_MAX_P STABILIZATION_ATTITUDE_FLOAT_REF_MAX_PDOT
-#define REF_ACCEL_MAX_Q STABILIZATION_ATTITUDE_FLOAT_REF_MAX_QDOT
-#define REF_ACCEL_MAX_R STABILIZATION_ATTITUDE_FLOAT_REF_MAX_RDOT
+#define REF_ACCEL_MAX_P STABILIZATION_ATTITUDE_REF_MAX_PDOT
+#define REF_ACCEL_MAX_Q STABILIZATION_ATTITUDE_REF_MAX_QDOT
+#define REF_ACCEL_MAX_R STABILIZATION_ATTITUDE_REF_MAX_RDOT
 
 struct FloatEulers stab_att_sp_euler;
 struct FloatQuat   stab_att_sp_quat;
@@ -43,31 +44,27 @@ struct FloatQuat   stab_att_ref_quat;
 struct FloatRates  stab_att_ref_rate;
 struct FloatRates  stab_att_ref_accel;
 
-struct FloatRefModel stab_att_ref_model[STABILIZATION_ATTITUDE_FLOAT_GAIN_NB];
+struct FloatRefModel stab_att_ref_model[STABILIZATION_ATTITUDE_GAIN_NB];
 
-static int ref_idx = STABILIZATION_ATTITUDE_FLOAT_GAIN_IDX_DEFAULT;
+static int ref_idx = STABILIZATION_ATTITUDE_GAIN_IDX_DEFAULT;
 
-static const float omega_p[] = STABILIZATION_ATTITUDE_FLOAT_REF_OMEGA_P;
-static const float zeta_p[] = STABILIZATION_ATTITUDE_FLOAT_REF_ZETA_P;
-static const float omega_q[] = STABILIZATION_ATTITUDE_FLOAT_REF_OMEGA_Q;
-static const float zeta_q[] = STABILIZATION_ATTITUDE_FLOAT_REF_ZETA_Q;
-static const float omega_r[] = STABILIZATION_ATTITUDE_FLOAT_REF_OMEGA_R;
-static const float zeta_r[] = STABILIZATION_ATTITUDE_FLOAT_REF_ZETA_R;
+static const float omega_p[] = STABILIZATION_ATTITUDE_REF_OMEGA_P;
+static const float zeta_p[] = STABILIZATION_ATTITUDE_REF_ZETA_P;
+static const float omega_q[] = STABILIZATION_ATTITUDE_REF_OMEGA_Q;
+static const float zeta_q[] = STABILIZATION_ATTITUDE_REF_ZETA_Q;
+static const float omega_r[] = STABILIZATION_ATTITUDE_REF_OMEGA_R;
+static const float zeta_r[] = STABILIZATION_ATTITUDE_REF_ZETA_R;
 
-static void reset_psi_ref_from_body(void) {
-  stab_att_ref_euler.psi = ahrs_float.ltp_to_body_euler.psi;
+static inline void reset_psi_ref_from_body(void) {
+  //sp has been set from body using stabilization_attitude_get_yaw_f, use that value
+  stab_att_ref_euler.psi = stab_att_sp_euler.psi;
   stab_att_ref_rate.r = 0;
   stab_att_ref_accel.r = 0;
 }
 
-static void update_ref_quat_from_eulers(void) {
+static inline void update_ref_quat_from_eulers(void) {
   struct FloatRMat ref_rmat;
-
-#ifdef STICKS_RMAT312
-  FLOAT_RMAT_OF_EULERS_312(ref_rmat, stab_att_ref_euler);
-#else
-  FLOAT_RMAT_OF_EULERS_321(ref_rmat, stab_att_ref_euler);
-#endif
+  FLOAT_RMAT_OF_EULERS(ref_rmat, stab_att_ref_euler);
   FLOAT_QUAT_OF_RMAT(stab_att_ref_quat, ref_rmat);
   FLOAT_QUAT_WRAP_SHORTEST(stab_att_ref_quat);
 }
@@ -81,22 +78,19 @@ void stabilization_attitude_ref_init(void) {
   FLOAT_RATES_ZERO( stab_att_ref_rate);
   FLOAT_RATES_ZERO( stab_att_ref_accel);
 
-  for (int i = 0; i < STABILIZATION_ATTITUDE_FLOAT_GAIN_NB; i++) {
+  for (int i = 0; i < STABILIZATION_ATTITUDE_GAIN_NB; i++) {
     RATES_ASSIGN(stab_att_ref_model[i].omega, omega_p[i], omega_q[i], omega_r[i]);
     RATES_ASSIGN(stab_att_ref_model[i].zeta, zeta_p[i], zeta_q[i], zeta_r[i]);
   }
 
 }
 
-void stabilization_attitude_ref_schedule(uint8_t idx)
-{
+void stabilization_attitude_ref_schedule(uint8_t idx) {
   ref_idx = idx;
 }
 
-void stabilization_attitude_ref_enter()
-{
+void stabilization_attitude_ref_enter(void) {
   reset_psi_ref_from_body();
-  stabilization_attitude_sp_enter();
   update_ref_quat_from_eulers();
 }
 
@@ -105,13 +99,27 @@ void stabilization_attitude_ref_enter()
  */
 #define DT_UPDATE (1./PERIODIC_FREQUENCY)
 
-void stabilization_attitude_ref_update() {
+// default to fast but less precise quaternion integration
+#ifndef STABILIZATION_ATTITUDE_REF_QUAT_INFINITESIMAL_STEP
+#define STABILIZATION_ATTITUDE_REF_QUAT_INFINITESIMAL_STEP TRUE
+#endif
+
+void stabilization_attitude_ref_update(void) {
 
   /* integrate reference attitude            */
+#if STABILIZATION_ATTITUDE_REF_QUAT_INFINITESIMAL_STEP
   struct FloatQuat qdot;
   FLOAT_QUAT_DERIVATIVE(qdot, stab_att_ref_rate, stab_att_ref_quat);
   QUAT_SMUL(qdot, qdot, DT_UPDATE);
   QUAT_ADD(stab_att_ref_quat, qdot);
+#else // use finite step (involves trig)
+  struct FloatQuat delta_q;
+  FLOAT_QUAT_DIFFERENTIAL(delta_q, stab_att_ref_rate, DT_UPDATE);
+  /* compose new ref_quat by quaternion multiplication of delta rotation and current ref_quat */
+  struct FloatQuat new_ref_quat;
+  FLOAT_QUAT_COMP(new_ref_quat, delta_q, stab_att_ref_quat);
+  QUAT_COPY(stab_att_ref_quat, new_ref_quat);
+#endif
   FLOAT_QUAT_NORMALIZE(stab_att_ref_quat);
 
   /* integrate reference rotational speeds   */

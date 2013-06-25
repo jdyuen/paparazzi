@@ -1,6 +1,4 @@
 /*
- * $Id: sim_ac_fw.c 3499 2009-06-16 17:38:56Z gov $
- *
  * Copyright (C) 2008 Gautier Hattenberger
  *
  * This file is part of paparazzi.
@@ -37,7 +35,7 @@ void airborne_run_one_step(void) {
   // SEE  sim_run_one_step
 }
 
-void autopilot_init(void) {
+void sim_autopilot_init(void) {
   init_fbw();
   init_ap();
 }

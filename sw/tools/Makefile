@@ -1,4 +1,4 @@
-# $Id$
+# Hey Emacs, this is a -*- makefile -*-
 #
 # Copyright (C) 2003-2006  Pascal Brisset, Antoine Drouin
 #
@@ -22,54 +22,52 @@
 # Quiet compilation
 Q=@
 
-OCAML=ocaml
-OCAMLC=ocamlc
-INCLUDES=-I ../lib/ocaml $(shell ocamlfind query -r -i-format xml-light) -I .
-OCAMLNETINCLUDES=$(shell ocamlfind query -r -i-format netstring)
-OCAMLNETCMA=$(shell ocamlfind query -r -a-format -predicates byte netstring)
-OCAMLLEX=ocamllex
-OCAMLYACC=ocamlyacc
+include ../Makefile.ocaml
 
-all: gen_common.cmo gen_aircraft.out gen_airframe.out gen_messages2.out gen_messages.out gen_ubx.out gen_mtk.out gen_flight_plan.out gen_radio.out gen_periodic.out gen_settings.out gen_tuning.out gen_xsens.out gen_modules.out find_free_msg_id.out gen_srtm.out
+INCLUDES =
+PKG = -package pprz
+LINKPKG = $(PKG) -linkpkg -dllpath-pkg pprz
+
+all: gen_common.cmo gen_aircraft.out gen_airframe.out gen_messages2.out gen_messages.out gen_ubx.out gen_mtk.out gen_flight_plan.out gen_radio.out gen_periodic.out gen_settings.out gen_xsens.out gen_modules.out gen_autopilot.out gen_abi.out find_free_msg_id.out gen_srtm.out mergelogs
 
 FP_CMO = fp_proc.cmo gen_flight_plan.cmo
 ABS_FP = $(FP_CMO:%=$$PAPARAZZI_SRC/sw/tools/%)
 
-gen_flight_plan.out : $(FP_CMO) ../lib/ocaml/lib-pprz.cma
+gen_flight_plan.out : $(FP_CMO)
 	@echo OL $@
-	$(Q)$(OCAMLC) $(INCLUDES) -custom -o $@ unix.cma str.cma xml-light.cma ivy-ocaml.cma lib-pprz.cma $^
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) $^
 
-fp_proc.cmo : fp_proc.cmi
-gen_flight_plan.cmo : fp_proc.cmi
+gen_srtm.out : gen_srtm.ml
+	@echo OL $@
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) $<
 
-gen_common.cmo : gen_common.cmi
+%.out : %.ml gen_common.cmo
+	@echo OL $<
+	$(Q)$(OCAMLC) $(INCLUDES) -o $@ $(LINKPKG) gen_common.cmo $<
 
-%.out : %.ml gen_common.ml Makefile
+%.cmo : %.ml
 	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) -o $@ unix.cma str.cma ivy-ocaml.cma xml-light.cma lib-pprz.cma gen_common.cmo $<
-	@cat ../../pprz_src_test.sh > $@
-	@echo '$(OCAML) -I $$PAPARAZZI_SRC/sw/tools $(shell ocamlfind query -r -i-format xml-light) $(OCAMLNETINCLUDES) -I $$PAPARAZZI_SRC/sw/lib/ocaml unix.cma str.cma ivy-ocaml.cma xml-light.cma $(OCAMLNETCMA) lib-pprz.cma gen_common.cmo $$PAPARAZZI_BIN/$< $$*' >> $@
-	@chmod a+x $@
-
-%.cmo : %.ml ../lib/ocaml/lib-pprz.cma
-	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(INCLUDES) $(PKG) -c $<
 
 %.cmi : %.mli
 	@echo OC $<
-	$(Q)$(OCAMLC) $(INCLUDES) -c $<
+	$(Q)$(OCAMLC) $(INCLUDES) $(PKG) -c $<
 
-%.ml : %.mll
-	@echo OC $<
-	$(Q)$(OCAMLLEX) $<
-
-%.ml : %.mly
-	@echo OC $<
-	$(Q)$(OCAMLYACC) $<
-
-%.mli : %.mly
-	@echo OC $<
-	$(Q)$(OCAMLYACC) $<
+mergelogs: mergelogs.c
+	gcc mergelogs.c -o mergelogs
 
 clean:
-	rm -f *.cm* *.out *~ fp_parser.ml fp_parser.mli
+	$(Q)rm -f *.cm* *.out *~ .depend fp_parser.ml fp_parser.mli mergelogs
+
+.PHONY: all clean
+
+#
+# Dependencies
+#
+
+.depend: Makefile
+	$(OCAMLDEP) -I $(LIBPPRZDIR) *.ml *.mli > .depend
+
+ifneq ($(MAKECMDGOALS),clean)
+-include .depend
+endif

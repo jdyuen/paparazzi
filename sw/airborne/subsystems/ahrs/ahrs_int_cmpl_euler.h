@@ -19,6 +19,14 @@
  * Boston, MA 02111-1307, USA.
  */
 
+/**
+ * @file subsystems/ahrs/ahrs_int_cmpl_euler.h
+ *
+ * Complementary filter in euler representation (fixed-point).
+ *
+ */
+
+
 #ifndef AHRS_INT_CMPL_EULER_H
 #define AHRS_INT_CMPL_EULER_H
 
@@ -28,19 +36,20 @@
 
 struct AhrsIntCmplEuler {
   struct Int32Rates  gyro_bias;
+  struct Int32Rates  imu_rate;
   struct Int32Eulers hi_res_euler;
   struct Int32Eulers measure;
   struct Int32Eulers residual;
   struct Int32Eulers measurement;
+  struct Int32Eulers ltp_to_imu_euler;
   int32_t reinj_1;
+  float mag_offset;
 };
 
 extern struct AhrsIntCmplEuler ahrs_impl;
 
 
 #ifdef AHRS_UPDATE_FW_ESTIMATOR
-// TODO copy ahrs to state instead of estimator
-void ahrs_update_fw_estimator(void);
 extern float ins_roll_neutral;
 extern float ins_pitch_neutral;
 #endif

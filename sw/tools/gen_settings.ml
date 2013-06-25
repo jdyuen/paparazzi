@@ -1,6 +1,4 @@
 (*
- * $Id$
- *
  * XML preprocessing for dynamic tuning
  *
  * Copyright (C) 2006 Pascal Brisset, Antoine Drouin
@@ -42,10 +40,10 @@ let rec flatten = fun xml r ->
     xml::r
   else
     match Xml.children xml with
-      [] -> r
-    | x::xs ->
-    List.iter (fun y -> assert(ExtXml.tag_is y (Xml.tag x))) xs;
-    List.fold_right flatten (x::xs) r
+        [] -> r
+      | x::xs ->
+        List.iter (fun y -> assert(ExtXml.tag_is y (Xml.tag x))) xs;
+        List.fold_right flatten (x::xs) r
 
 
 module StringSet = Set.Make(struct type t = string let compare = compare end)
@@ -81,9 +79,14 @@ let print_dl_settings = fun settings ->
       let v = ExtXml.attrib s "var" in
       begin
         try
-          let h = ExtXml.attrib s "handler" and
-              m =  ExtXml.attrib s "module" in
-          lprintf "case %d: %s_%s( _value ); _value = %s; break;\\\n" !idx (Filename.basename m) h v
+          let h = ExtXml.attrib s "handler" in
+          begin
+            try
+              let m =  ExtXml.attrib s "module" in
+              lprintf "case %d: %s_%s( _value ); _value = %s; break;\\\n" !idx (Filename.basename m) h v
+            with
+                ExtXml.Error e -> prerr_endline (sprintf "Error: You need to specify the module attribute for setting %s to use the handler %s" v h); exit 1
+          end;
         with
             ExtXml.Error e -> lprintf "case %d: %s = _value; break;\\\n" !idx v
       end;
@@ -139,14 +142,14 @@ let print_dl_settings = fun settings ->
   left()
 
 (*
-   Generate code for persistent settings
+  Generate code for persistent settings
 *)
 let print_persistent_settings = fun settings ->
   let settings = flatten settings [] in
   let pers_settings =
     List.filter (fun x -> try let _ = Xml.attrib x "persistent" in true with _ -> false) settings in
   (* structure declaration *)
-(*  if List.length pers_settings > 0 then begin *)
+  (*  if List.length pers_settings > 0 then begin *)
   lprintf "\n/* Persistent Settings */\n";
   lprintf "struct PersistentSettings {\n";
   right();
@@ -182,7 +185,7 @@ let print_persistent_settings = fun settings ->
           let h = ExtXml.attrib s "handler" and
               m =  ExtXml.attrib s "module" in
           lprintf "%s_%s( pers_settings.s_%d );\n"  (Filename.basename m) h !idx ;
-        (*	   lprintf "%s = pers_settings.s_%d;\n" v !idx *) (* do we want to set the value too or just call the handler ? *)
+        (*     lprintf "%s = pers_settings.s_%d;\n" v !idx *) (* do we want to set the value too or just call the handler ? *)
         with
             ExtXml.Error e ->  lprintf "%s = pers_settings.s_%d;\n" v !idx
       end;
@@ -194,10 +197,10 @@ let print_persistent_settings = fun settings ->
 
 
 (*
-   Blaaaaaa2
+  Blaaaaaa2
 *)
 let calib_mode_of_rc = function
-    "gain_1_up" -> 1, "up"
+"gain_1_up" -> 1, "up"
   | "gain_1_down" -> 1, "down"
   | "gain_2_up" -> 2, "up"
   | "gain_2_down" -> 2, "down"
@@ -206,7 +209,7 @@ let calib_mode_of_rc = function
 let param_macro_of_type = fun x -> "ParamVal"^String.capitalize x
 
 let inttype = function
-    "int16" -> "int16_t"
+"int16" -> "int16_t"
   | "float" -> "float"
   | x -> failwith (sprintf "Gen_calib.inttype: unknown type '%s'" x)
 
@@ -218,7 +221,7 @@ let parse_rc_setting = fun xml ->
   let param_macro = param_macro_of_type t in
   let dot_pos =
     try String.rindex var '.' + 1 with
-      Not_found -> 0 in
+        Not_found -> 0 in
   let var_nostruct = String.sub var dot_pos (String.length var - dot_pos) in
   let var_init = var_nostruct ^ "_init" in
 
@@ -256,7 +259,7 @@ let join_xml_files = fun xml_files ->
           Not_found -> [] in
     let these_dl_settings =
       try Xml.children (ExtXml.child xml "dl_settings") with
-    Not_found -> [] in
+          Not_found -> [] in
     rc_settings := these_rc_settings @ !rc_settings;
     dl_settings := these_dl_settings @ !dl_settings)
     xml_files;
@@ -299,6 +302,6 @@ let _ =
 
     finish h_name
   with
-    Xml.Error e -> prerr_endline (Xml.error e); exit 1
-  | Dtd.Prove_error e ->  prerr_endline (Dtd.prove_error e); exit 1
-  | Dtd.Parse_error e ->  prerr_endline (Dtd.parse_error e); exit 1
+      Xml.Error e -> prerr_endline (Xml.error e); exit 1
+    | Dtd.Prove_error e ->  prerr_endline (Dtd.prove_error e); exit 1
+    | Dtd.Parse_error e ->  prerr_endline (Dtd.parse_error e); exit 1

@@ -1,6 +1,4 @@
 /*
- * Paparazzi $Id$
- *
  * Copyright (C) 2006- Pascal Brisset, Antoine Drouin
  *
  * This file is part of paparazzi.
@@ -19,11 +17,12 @@
  * along with paparazzi; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
- *
  */
 
-/** \file fbw_downlink.h
- *  \brief Set of macros defining the periodic telemetry messages of FBW process
+/**
+ * @file firmwares/fixedwing/fbw_downlink.h
+ *
+ * Set of macros defining the periodic telemetry messages of FBW process.
  *
  * The PeriodicSendAp() macro is generated from the telemetry description
  * (named in conf.xml, usually in conf/telemetry directory). This macro
@@ -39,8 +38,8 @@
 #include "messages.h"
 #include "generated/periodic_telemetry.h"
 #include "generated/airframe.h"
-#include "commands.h"
-#include "actuators.h"
+#include "subsystems/commands.h"
+#include "subsystems/actuators.h"
 
 #include "mcu_periph/uart.h"
 #include "firmwares/fixedwing/main_fbw.h"
@@ -78,7 +77,7 @@
 #endif // RADIO_CONTROL
 
 #ifdef ACTUATORS
-#define PERIODIC_SEND_ACTUATORS(_trans, _dev) DOWNLINK_SEND_ACTUATORS(_trans, _dev, SERVOS_NB, actuators)
+#define PERIODIC_SEND_ACTUATORS(_trans, _dev) DOWNLINK_SEND_ACTUATORS(_trans, _dev, ACTUATORS_NB, actuators)
 #else
 #define PERIODIC_SEND_ACTUATORS(_trans, _dev) {}
 #endif

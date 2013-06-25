@@ -57,7 +57,7 @@ unsigned char* md5 = (unsigned char*)MD5SUM;
 #define RadOfDeg(x) ((x) * (M_PI/180.))
 #define DegOfRad(x) ((x) * (180./M_PI))
 
-static const char usage_str[] = 
+static const char usage_str[] =
 "tcp2ivy [options]\n"
 "options:\n"
 "  -s <server address>\n";
@@ -74,11 +74,11 @@ unsigned char gps_utm_zone;
 int gps_lat, gps_lon; /* 1e7 deg */
 int gps_hmsl;
 short estimator_airspeed;
-unsigned char electrical_vsupply;
+unsigned short electrical_vsupply;
 unsigned char nav_block;
 unsigned short energy;
 unsigned char throttle;
-unsigned short estimator_flight_time;
+unsigned short autopilot_flight_time;
 unsigned char nav_utm_zone0;
 float latlong_utm_x, latlong_utm_y;
 unsigned char pprz_mode;
@@ -124,6 +124,7 @@ static gboolean read_data(GIOChannel *chan, GIOCondition cond, gpointer data) {
       //    FillBufWith16bit(com_trans.buf, 15, (uint16_t)(estimator_airspeed*100)); // TAS (cm/s)
       estimator_airspeed = buf2ushort(&buf[14]);
       //    com_trans.buf[17] = electrical.vsupply; // decivolt
+      //FIXME: electrical.vsupply is now a uint16
       electrical_vsupply = buf[16];
       //    com_trans.buf[18] = (uint8_t)(energy / 100); // deciAh
       energy = buf[17];
@@ -133,8 +134,8 @@ static gboolean read_data(GIOChannel *chan, GIOCondition cond, gpointer data) {
       pprz_mode = buf[19];
       //    com_trans.buf[21] = nav_block;
       nav_block = buf[20];
-      //    FillBufWith16bit(com_trans.buf, 22, estimator_flight_time); 
-      estimator_flight_time = buf2ushort(&buf[21]);
+      //    FillBufWith16bit(com_trans.buf, 22, autopilot_flight_time);
+      autopilot_flight_time = buf2ushort(&buf[21]);
 
 #if 0
       gps_lat = 52.2648312 * 1e7;
@@ -148,7 +149,7 @@ static gboolean read_data(GIOChannel *chan, GIOCondition cond, gpointer data) {
       throttle = 51;
       pprz_mode = 2;
       nav_block = 1;
-      estimator_flight_time = 123;
+      autopilot_flight_time = 123;
 #endif
 
       printf("**** message received from iridium module ****\n");
@@ -163,7 +164,7 @@ static gboolean read_data(GIOChannel *chan, GIOCondition cond, gpointer data) {
       printf("throttle %d\n", throttle);
       printf("pprz_mode %d\n", pprz_mode);
       printf("nav_block %d\n", nav_block);
-      printf("estimator_flight_time %d\n", estimator_flight_time);
+      printf("autopilot_flight_time %d\n", autopilot_flight_time);
       fflush(stdout);
 
       IvySendMsg("%d GENERIC_COM %d %d %d %d %d %d %d %d %d %d %d %d",
@@ -179,7 +180,7 @@ static gboolean read_data(GIOChannel *chan, GIOCondition cond, gpointer data) {
           throttle,
           pprz_mode,
           nav_block,
-          estimator_flight_time);
+          autopilot_flight_time);
 
     }
     else {

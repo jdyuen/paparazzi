@@ -1,21 +1,19 @@
 <!-- Paparazzi airframe DTD -->
 
-<!ELEMENT airframe (include|servos|commands|csc_boards|rc_commands|auto_rc_commands|ap_only_commands|command_laws|section|makefile|modules|firmware)*>
+<!ELEMENT airframe (include|servos|commands|rc_commands|auto_rc_commands|ap_only_commands|command_laws|section|makefile|modules|firmware|autopilot)*>
 <!ELEMENT include EMPTY>
 <!ELEMENT servos (servo)*>
 <!ELEMENT commands (axis)*>
-<!ELEMENT csc_boards (board)*>
-<!ELEMENT board (msg)*>
-<!ELEMENT msg (field_map)*>
-<!ELEMENT field_map EMPTY>
 <!ELEMENT rc_commands (set)*>
 <!ELEMENT auto_rc_commands (set)*>
 <!ELEMENT ap_only_commands (copy)*>
-<!ELEMENT command_laws (let|set)*>
+<!ELEMENT command_laws (let|set|call|ratelimit)*>
 <!ELEMENT section (define|linear)*>
 <!ELEMENT servo EMPTY>
 <!ELEMENT axis EMPTY>
 <!ELEMENT set EMPTY>
+<!ELEMENT call EMPTY>
+<!ELEMENT ratelimit EMPTY>
 <!ELEMENT copy EMPTY>
 <!ELEMENT let EMPTY>
 <!ELEMENT define EMPTY>
@@ -27,12 +25,17 @@
 <!ELEMENT firmware (target|subsystem|configure|define)*>
 <!ELEMENT target (subsystem|configure|define)*>
 <!ELEMENT subsystem (configure|define)*>
+<!ELEMENT autopilot EMPTY>
 
 <!ATTLIST include
 href CDATA #REQUIRED>
 
 <!ATTLIST firmware
 name CDATA #REQUIRED>
+
+<!ATTLIST autopilot
+name CDATA #REQUIRED
+freq CDATA #IMPLIED>
 
 <!ATTLIST target
 name CDATA #REQUIRED
@@ -53,7 +56,6 @@ driver CDATA #IMPLIED>
 <!ATTLIST rc_commands>
 <!ATTLIST ap_only_commands>
 <!ATTLIST command_laws>
-<!ATTLIST csc_boards>
 
 <!ATTLIST section
 name CDATA #IMPLIED
@@ -66,17 +68,6 @@ min CDATA #REQUIRED
 neutral CDATA #REQUIRED
 max CDATA #REQUIRED>
 
-<!ATTLIST board
-id CDATA #REQUIRED>
-
-<!ATTLIST msg
-id CDATA #REQUIRED
-type CDATA #REQUIRED>
-
-<!ATTLIST field_map
-field CDATA #REQUIRED
-servo_id CDATA #REQUIRED>
-
 <!ATTLIST axis
 name CDATA #REQUIRED
 failsafe_value CDATA #REQUIRED>
@@ -86,12 +77,21 @@ value CDATA #REQUIRED
 command CDATA #IMPLIED
 servo CDATA #IMPLIED>
 
+<!ATTLIST call
+fun CDATA #REQUIRED>
+
 <!ATTLIST copy
 command CDATA #REQUIRED>
 
 <!ATTLIST let
 var CDATA #REQUIRED
 value CDATA #REQUIRED>
+
+<!ATTLIST ratelimit
+var CDATA #REQUIRED
+value CDATA #REQUIRED
+rate_min CDATA #REQUIRED
+rate_max CDATA #REQUIRED>
 
 <!ATTLIST define
 name CDATA #REQUIRED
