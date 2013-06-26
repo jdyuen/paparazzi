@@ -168,6 +168,7 @@
 #define OO_CHKMODE 'k'
 #define OO_INTTIME 10 //integration time in ms
 #define OO_PIXEL_N 0x02 // transmit every n pixels
+#define OO_AVERAGE 0x00 //average n pixels to left and n pixels to right
 #define OO_ACK 0x06
 #define OO_NAK 0x15
 #define OO_STX 0x02
@@ -179,12 +180,13 @@
 #define OO_GOT_ITIME 2
 #define OO_ENABLED_CHKSUM 3
 #define OO_SET_TRIGGER 4
-#define OO_FIRST_SAMPLE 5
-#define OO_READY_SAMPLE 6
-#define OO_GOT_STX 7
-#define OO_SET_TIMESTAMP 8
-#define OO_GOT_PAYLOAD 9
-#define OO_GOT_CHK_A 10
+#define OO_SET_PIXELS 5
+#define OO_FIRST_SAMPLE 6
+#define OO_READY_SAMPLE 7
+#define OO_GOT_STX 8
+#define OO_SET_TIMESTAMP 9
+#define OO_GOT_PAYLOAD 10
+#define OO_GOT_CHK_A 11
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -452,6 +454,10 @@ char log_oo(unsigned char c, unsigned char source)
     if (c == OO_ACK) //wait for ACK from pixel mode set
       oo_status++;
     break;
+  case OO_SET_PIXELS:
+    if (c == OO_ACK) //wait for ACK from boxcar set
+      oo_status++;
+    break;
   case OO_FIRST_SAMPLE:
     if (c == OO_STX)
       oo_status++;
@@ -695,6 +701,12 @@ int do_log(void)
           Uart1Transmit(0xA2);
           Uart1Transmit(0x00); // every n pixels
           Uart1Transmit(OO_PIXEL_N);
+          oo_init = -1;
+          break;
+        case OO_SET_PIXELS:
+          Uart1Transmit('B'); //enable boxcar averaging of transmitted pixels
+          Uart1Transmit(0x00);
+          Uart1Transmit(OO_AVERAGE);
           oo_init = -1;
           break;
         case OO_FIRST_SAMPLE:
