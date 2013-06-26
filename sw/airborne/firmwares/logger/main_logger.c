@@ -657,29 +657,29 @@ int do_log(void)
           }
           break;
         case OO_INIT:
-          sys_time_usleep(10000); //10000 = 10ms
+          sys_time_usleep(2000); //2000 = 2ms
           Uart1Transmit(OO_INTSET); //set the spectrometer integration time
           unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
           unsigned char timeLow,timeHigh;
           timeLow = (char)intTime;
           timeHigh = (char)(intTime >> 8);
-          sys_time_usleep(10000); //10000 = 10ms
+          sys_time_usleep(2000); //2000 = 2ms
           Uart1Transmit(timeHigh);
           Uart1Transmit(timeLow);
           // transmit_timestamp = getclock();
           oo_init = -1;
-          sys_time_usleep(10000); //10000 = 10ms
+          sys_time_usleep(2000); //2000 = 2ms
           break;
         case OO_GOT_ITIME:
           Uart1Transmit('k'); //enable transmission of spectrum checksum
-          sys_time_usleep(10000);
+          sys_time_usleep(2000);
           Uart1Transmit('!');
           Uart1Transmit(0x00);
           oo_init = -1;
           break;
         case OO_ENABLED_CHKSUM:
           Uart1Transmit('T'); //set trigger mode (see manual)
-          sys_time_usleep(10000);
+          sys_time_usleep(2000);
           Uart1Transmit(0x00);
           Uart1Transmit(0x03);
           oo_init = -1;
