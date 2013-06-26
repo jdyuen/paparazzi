@@ -177,11 +177,12 @@
 #define OO_INIT 1
 #define OO_GOT_ITIME 2
 #define OO_ENABLED_CHKSUM 3
-#define OO_READY_SAMPLE 4
-#define OO_GOT_STX 5
-#define OO_SET_TIMESTAMP 6
-#define OO_GOT_PAYLOAD 7
-#define OO_GOT_CHK_A 8
+#define OO_FIRST_SAMPLE 4
+#define OO_READY_SAMPLE 5
+#define OO_GOT_STX 6
+#define OO_SET_TIMESTAMP 7
+#define OO_GOT_PAYLOAD 8
+#define OO_GOT_CHK_A 9
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -419,7 +420,7 @@ void oo_log_payload(int len, unsigned char source, unsigned int timestamp)
 //  dl_parse_msg();
 }
 
-/* logging an Ocean Optics USB4000 */
+/* logging an Ocean Optics USB2000+ */
 char log_oo(unsigned char c, unsigned char source)
 {
   static unsigned char oo_status = OO_UNINIT;
@@ -443,6 +444,10 @@ char log_oo(unsigned char c, unsigned char source)
     break;
   case OO_ENABLED_CHKSUM:
     if (c == OO_ACK) //wait for ACK from checksum enable
+      oo_status++;
+    break;
+  case OO_FIRST_SAMPLE:
+    if (c == OO_STX)
       oo_status++;
     break;
   case OO_READY_SAMPLE: //wait for STX - data will follow
@@ -496,6 +501,7 @@ char log_oo(unsigned char c, unsigned char source)
     for (i = 0; i < oo_payload_len; i++) {
       oo_log_buffer[i+LOG_DATA_OFFSET] = oo_payload[i];
     }
+    Uart1Transmit(OO_SAMPLE); //tell oo to collect data
     oo_log_payload(oo_payload_len, source, oo_timestamp);
     LED_TOGGLE(2);
     goto restart;
@@ -619,38 +625,11 @@ int do_log(void)
 
 
 #ifdef USE_UART0
-  #if LOG_OO_0
-      static unsigned char oo_init = UNINIT;
-      if (oo_init == OO_UNINIT) {
-        Uart0Transmit(OO_VERSION); //will reply with ACK if ready
-        oo_init = -1;
-      }
-      if (oo_init == OO_INIT) {
-        Uart0Transmit(OO_INTSET); //set the spectrometer integration time
-        unsigned int intTime = OO_INTTIME;
-        unsigned char timeLow,timeHigh;
-        timeLow = (char)intTime;
-        timeHigh = (char)(intTime >> 8);
-        Uart0Transmit(timeHigh);
-        Uart0Transmit(timeLow);
-      }
-      if (oo_init == OO_GOT_ITIME) {
-        Uart0Transmit(OO_SAMPLE); //tell oo to collect data
-        oo_init = -1;
-        // LED_TOGGLE(2);
-        // sys_time_usleep(1000000);
-        // oo_init++;
-      }
-  #endif
       temp = 0;
       while (Uart0ChAvailable() && (temp++ < 128))
       {
 //		LED_TOGGLE(3);
 			inc = Uart0Getch();
-  #if LOG_OO_0
-          // LED_TOGGLE(3);
-          oo_init = log_oo(inc, LOG_SOURCE_UART0);
-  #else
   #ifdef LOG_XBEE
             log_xbee(inc, LOG_SOURCE_UART0);
   #else
@@ -658,7 +637,6 @@ int do_log(void)
             log_pprz(inc, LOG_SOURCE_UART0);
   #else
   #error no log transport protocol selected UART0
-  #endif
   #endif
   #endif
         }
@@ -706,9 +684,11 @@ int do_log(void)
           Uart1Transmit(0x03);
           oo_init = -1;
           break;
-        case OO_READY_SAMPLE:
+        case OO_FIRST_SAMPLE:
           Uart1Transmit(OO_SAMPLE); //tell oo to collect data
           transmit_timestamp = getclock();
+          oo_init = -1;
+        case OO_READY_SAMPLE:
           oo_init = -1;
         }
   #endif
@@ -818,7 +798,7 @@ int main(void)
   {
     LED_OFF(LED_YELLOW);
     LED_ON(LED_RED);
-    main_mass_storage();
+    // main_mass_storage();
   }
 
   while(1)
@@ -864,7 +844,7 @@ int main(void)
       {
         LED_OFF(LED_YELLOW);
         LED_ON(LED_RED);
-        main_mass_storage();
+        // main_mass_storage();
       }
     }
     LED_ON(LED_YELLOW);
