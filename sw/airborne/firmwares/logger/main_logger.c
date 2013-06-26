@@ -167,6 +167,7 @@
 #define OO_INTSET 'I'
 #define OO_CHKMODE 'k'
 #define OO_INTTIME 10 //integration time in ms
+#define OO_PIXEL_N 0x02 // transmit every n pixels
 #define OO_ACK 0x06
 #define OO_NAK 0x15
 #define OO_STX 0x02
@@ -177,12 +178,13 @@
 #define OO_INIT 1
 #define OO_GOT_ITIME 2
 #define OO_ENABLED_CHKSUM 3
-#define OO_FIRST_SAMPLE 4
-#define OO_READY_SAMPLE 5
-#define OO_GOT_STX 6
-#define OO_SET_TIMESTAMP 7
-#define OO_GOT_PAYLOAD 8
-#define OO_GOT_CHK_A 9
+#define OO_SET_TRIGGER 4
+#define OO_FIRST_SAMPLE 5
+#define OO_READY_SAMPLE 6
+#define OO_GOT_STX 7
+#define OO_SET_TIMESTAMP 8
+#define OO_GOT_PAYLOAD 9
+#define OO_GOT_CHK_A 10
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
@@ -446,6 +448,10 @@ char log_oo(unsigned char c, unsigned char source)
     if (c == OO_ACK) //wait for ACK from checksum enable
       oo_status++;
     break;
+  case OO_SET_TRIGGER:
+    if (c == OO_ACK) //wait for ACK from pixel mode set
+      oo_status++;
+    break;
   case OO_FIRST_SAMPLE:
     if (c == OO_STX)
       oo_status++;
@@ -657,31 +663,38 @@ int do_log(void)
           }
           break;
         case OO_INIT:
-          sys_time_usleep(2000); //2000 = 2ms
           Uart1Transmit(OO_INTSET); //set the spectrometer integration time
           unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
           unsigned char timeLow,timeHigh;
           timeLow = (char)intTime;
           timeHigh = (char)(intTime >> 8);
-          sys_time_usleep(2000); //2000 = 2ms
           Uart1Transmit(timeHigh);
           Uart1Transmit(timeLow);
           // transmit_timestamp = getclock();
           oo_init = -1;
-          sys_time_usleep(2000); //2000 = 2ms
           break;
         case OO_GOT_ITIME:
           Uart1Transmit('k'); //enable transmission of spectrum checksum
-          sys_time_usleep(2000);
           Uart1Transmit('!');
           Uart1Transmit(0x00);
           oo_init = -1;
           break;
         case OO_ENABLED_CHKSUM:
           Uart1Transmit('T'); //set trigger mode (see manual)
-          sys_time_usleep(2000);
           Uart1Transmit(0x00);
           Uart1Transmit(0x03);
+          oo_init = -1;
+          break;
+        case OO_SET_TRIGGER:
+          Uart1Transmit('P'); //set pixels to transmit
+          Uart1Transmit(0x00);
+          Uart1Transmit(0x03); // transmit x through y every n pixels
+          Uart1Transmit(0x00); //pixel 159 (400.04nm)
+          Uart1Transmit(0x9F);
+          Uart1Transmit(0x07); // pixel 1954 (1000.15nm)
+          Uart1Transmit(0xA2);
+          Uart1Transmit(0x00); // every n pixels
+          Uart1Transmit(OO_PIXEL_N);
           oo_init = -1;
           break;
         case OO_FIRST_SAMPLE:
