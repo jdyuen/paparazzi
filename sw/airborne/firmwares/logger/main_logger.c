@@ -166,7 +166,7 @@
 #define OO_VERSION 'v'
 #define OO_INTSET 'I'
 #define OO_CHKMODE 'k'
-#define OO_INTTIME 10 //integration time in ms
+// #define OO_INTTIME 10 //integration time in ms
 #define OO_PIXEL_N 0x02 // transmit every n pixels
 #define OO_AVERAGE 0x00 //average n pixels to left and n pixels to right
 #define OO_ACK 0x06
@@ -190,6 +190,17 @@
 #define OO_PAYLOAD_LEN 8000
 #define OO_MSG_SIZE 8000
 #define OO_DATA_OFFSET 2
+
+/** Define DIP switch pins **/
+#define DIP_1 12 // P0.12 (P8)
+#define DIP_2 10 // P0.10 (P7)
+#define DIP_3 21 // P0.21 (P6)
+#define DIP_4 22 // P0.22 (P5)
+#define DIP_5 25 // P0.25 (P4)
+#define DIP_6 28 // P0.28 (P3)
+#define DIP_7 29 // P0.29 (P2)
+#define DIP_8 30 // P0.30 (P1)
+
 //increase the UART rx buffer size
 // #if LOG_OO_0
 // #if UART_RX_BUFFER_SIZE
@@ -226,6 +237,7 @@ void log_xbee(unsigned char c, unsigned char source);
 void log_pprz(unsigned char c, unsigned char source);
 char log_oo(unsigned char c, unsigned char source);
 int do_log(void);
+int read_dip(void);
 
 DirList list;
 EmbeddedFileSystem efs;
@@ -286,6 +298,24 @@ unsigned int getclock(void)
     clock = (((uint64_t)clock_msb << 32) | (uint64_t)clock_lsb) / LOG_DIV;
 
     return(clock & 0xFFFFFFFF);
+}
+
+int read_dip(void)
+{
+  uint32_t dipTime = 0;
+
+  // read dip switches as binary integration time (MSB first)
+  dipTime |= ((IO0PIN & _BV(DIP_1))>>DIP_1) <<7;
+  dipTime |= ((IO0PIN & _BV(DIP_2))>>DIP_2) <<6;
+  dipTime |= ((IO0PIN & _BV(DIP_3))>>DIP_3) <<5;
+  dipTime |= ((IO0PIN & _BV(DIP_4))>>DIP_4) <<4;
+  dipTime |= ((IO0PIN & _BV(DIP_5))>>DIP_5) <<3;
+  dipTime |= ((IO0PIN & _BV(DIP_6))>>DIP_6) <<2;
+  dipTime |= ((IO0PIN & _BV(DIP_7))>>DIP_7) <<1;
+  dipTime |= ((IO0PIN & _BV(DIP_8))>>DIP_8) <<0;
+
+  dipTime = (uint8_t)~dipTime;
+  return dipTime;
 }
 
 /** Parsing a frame data and copy the payload to the log buffer */
@@ -670,10 +700,15 @@ int do_log(void)
           break;
         case OO_INIT:
           Uart1Transmit(OO_INTSET); //set the spectrometer integration time
-          unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
           unsigned char timeLow,timeHigh;
-          timeLow = (char)intTime;
-          timeHigh = (char)(intTime >> 8);
+          #if OO_INTTIME
+            unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
+            timeLow = (char)intTime;
+            timeHigh = (char)(intTime >> 8);
+          #else
+            timeHigh = 0x00;
+            timeLow = read_dip();
+          #endif
           Uart1Transmit(timeHigh);
           Uart1Transmit(timeLow);
           // transmit_timestamp = getclock();
