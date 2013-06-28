@@ -120,17 +120,20 @@
 */
 
 #ifndef LED_GREEN
-#define LED_GREEN	3
+#define LED_GREEN	3 //STAT1, green LED
 #endif
 
 #ifndef LED_YELLOW
-#define LED_YELLOW	2
+#define LED_YELLOW	2 //STAT0, red LED
 #endif
 
 #ifndef LED_RED
 #define LED_RED		1
 #endif
 
+#ifndef LED_MOSI
+#define LED_MOSI  4
+#endif
 
 /* USB Vbus (= P0.23) */
 #define VBUS_PIN 23
@@ -181,6 +184,7 @@
 #define OO_ENABLED_CHKSUM 3
 #define OO_SET_TRIGGER 4
 #define OO_SET_PIXELS 5
+// #define OO_SET_BOXCAR 6
 #define OO_FIRST_SAMPLE 6
 #define OO_READY_SAMPLE 7
 #define OO_GOT_STX 8
@@ -488,6 +492,10 @@ char log_oo(unsigned char c, unsigned char source)
     if (c == OO_ACK) //wait for ACK from boxcar set
       oo_status++;
     break;
+  // case OO_SET_BOXCAR:
+  //   if (c == OO_ACK) //wait for ACK from boxcar set
+  //     oo_status++;
+  //   break;
   case OO_FIRST_SAMPLE:
     if (c == OO_STX)
       oo_status++;
@@ -667,6 +675,12 @@ int do_log(void)
 
 
 #ifdef USE_UART0
+  // #if OO_DEBUG
+  //   if (!(Uart0CheckRxSpace(125)) || !(Uart1CheckRxSpace(125))){
+  //     LED_TOGGLE(LED_MOSI);
+  //   }
+  // #endif
+
       temp = 0;
       while (Uart0ChAvailable() && (temp++ < 128))
       {
@@ -682,9 +696,21 @@ int do_log(void)
   #endif
   #endif
         }
+      #if OO_DEBUG
+        if (temp > 120){
+          LED_TOGGLE(LED_MOSI);
+        }
+      #endif
 #endif
+
 #ifdef USE_UART1
   #if LOG_OO_1
+      // #if OO_DEBUG
+      //   if (!(Uart0CheckRxSpace(125)) || !(Uart1CheckRxSpace(125))){
+      //     LED_TOGGLE(LED_MOSI);
+      //   }
+      // #endif
+
         static unsigned char oo_init = OO_UNINIT;
         static unsigned int transmit_timestamp = 0;
         static unsigned int transmit_delta;
@@ -744,6 +770,12 @@ int do_log(void)
           Uart1Transmit(OO_AVERAGE);
           oo_init = -1;
           break;
+        // case OO_SET_BOXCAR:
+        //   Uart1Transmit('G'); //enable data compression
+        //   Uart1Transmit('!');
+        //   Uart1Transmit(0x00);
+        //   oo_init = -1;
+        //   break;  
         case OO_FIRST_SAMPLE:
           Uart1Transmit(OO_SAMPLE); //tell oo to collect data
           transmit_timestamp = getclock();
@@ -771,6 +803,11 @@ int do_log(void)
   #endif
   #endif
         }
+      #if OO_DEBUG  
+        if (temp > 120){
+          LED_TOGGLE(LED_MOSI);
+        }
+      #endif
 #endif
     }
     LED_OFF(LED_GREEN);

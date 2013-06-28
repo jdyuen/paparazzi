@@ -59,3 +59,9 @@ bool_t uart_check_free_space(struct uart_periph* p, uint8_t len) {
   return (uint16_t)(space - 1) >= len;
 }
 
+bool_t uart_check_rx_space(struct uart_periph* p, uint8_t len) {
+  int16_t space = p->rx_extract_idx - p->rx_insert_idx;
+  if (space <= 0)
+    space += UART_RX_BUFFER_SIZE;
+  return (uint16_t)(space - 1) >= len;
+}

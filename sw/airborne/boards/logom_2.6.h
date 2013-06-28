@@ -56,8 +56,8 @@
 #ifndef USE_LED_4
 #define USE_LED_4 1
 #endif
-#define LED_4_BANK 1
-#define LED_4_PIN 17
+#define LED_4_BANK 0
+#define LED_4_PIN 19 //logo MOSI
 
 #define POWER_SWITCH_LED 4
 

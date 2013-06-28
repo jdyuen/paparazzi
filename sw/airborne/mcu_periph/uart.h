@@ -61,6 +61,7 @@ extern void uart_periph_set_baudrate(struct uart_periph* p, uint32_t baud, bool_
 //extern void uart_periph_init_param(struct uart_periph* p, uint32_t baud, uint8_t mode, uint8_t fmode, char * dev);
 extern void uart_transmit(struct uart_periph* p, uint8_t data);
 extern bool_t uart_check_free_space(struct uart_periph* p, uint8_t len);
+extern bool_t uart_check_rx_space(struct uart_periph* p, uint8_t len);
 
 #define UartChAvailable(_p) (_p.rx_insert_idx != _p.rx_extract_idx)
 
@@ -77,6 +78,7 @@ extern void uart0_init(void);
 
 #define Uart0Init() uart_periph_init(&uart0)
 #define Uart0CheckFreeSpace(_x) uart_check_free_space(&uart0, _x)
+#define Uart0CheckRxSpace(_x) uart_check_rx_space(&uart0, _x)
 #define Uart0Transmit(_x) uart_transmit(&uart0, _x)
 #define Uart0SendMessage() {}
 #define Uart0ChAvailable() UartChAvailable(uart0)
@@ -102,6 +104,7 @@ extern void uart1_init(void);
 
 #define Uart1Init() uart_periph_init(&uart1)
 #define Uart1CheckFreeSpace(_x) uart_check_free_space(&uart1, _x)
+#define Uart1CheckRxSpace(_x) uart_check_rx_space(&uart1, _x)
 #define Uart1Transmit(_x) uart_transmit(&uart1, _x)
 #define Uart1SendMessage() {}
 #define Uart1ChAvailable() UartChAvailable(uart1)
