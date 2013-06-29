@@ -167,9 +167,9 @@
 /** Receiving ocean optics messages */
 #define OO_SAMPLE 'S'
 #define OO_VERSION 'v'
-#define OO_INTSET 'I'
+#define OO_INTSET 'i'
 #define OO_CHKMODE 'k'
-// #define OO_INTTIME 10 //integration time in ms
+// #define OO_INTTIME 10004 //integration time in micro sec (undef for dipswitches)
 #define OO_PIXEL_N 0x02 // transmit every n pixels
 #define OO_AVERAGE 0x00 //average n pixels to left and n pixels to right
 #define OO_ACK 0x06
@@ -309,7 +309,7 @@ int read_dip(void)
   uint32_t dipTime = 0;
 
   // read dip switches as binary integration time (MSB first)
-  dipTime |= ((IO0PIN & _BV(DIP_1))>>DIP_1) <<7;
+  dipTime |= 1 << 7; //first bit will be 0 after invert
   dipTime |= ((IO0PIN & _BV(DIP_2))>>DIP_2) <<6;
   dipTime |= ((IO0PIN & _BV(DIP_3))>>DIP_3) <<5;
   dipTime |= ((IO0PIN & _BV(DIP_4))>>DIP_4) <<4;
@@ -318,7 +318,26 @@ int read_dip(void)
   dipTime |= ((IO0PIN & _BV(DIP_7))>>DIP_7) <<1;
   dipTime |= ((IO0PIN & _BV(DIP_8))>>DIP_8) <<0;
 
-  dipTime = (uint8_t)~dipTime;
+  dipTime = (uint8_t)~dipTime; //invert because DIP ON sends 0
+
+  // DIP1 ON for microsecond integration time, OFF for milisecond
+  if ((IO0PIN & _BV(DIP_1))>>DIP_1)
+    //miliseconds selected, convert to microseconds
+    dipTime = dipTime * 1000;
+  else
+    //microseconds selected, multiply by 100 (45 = 4.5ms)
+    dipTime = dipTime * 100;
+
+  //save int time to sdcard
+  oo_log_buffer[7] = 0xFD;
+  oo_log_buffer[8] = 0xFD;
+  oo_log_buffer[9] = (uint8_t)(dipTime >> 24);
+  oo_log_buffer[10] = (uint8_t)(dipTime >> 16);
+  oo_log_buffer[11] = (uint8_t)(dipTime >> 8);
+  oo_log_buffer[12] = (uint8_t)dipTime;
+  oo_timestamp = getclock();
+  oo_log_payload(6, LOG_SOURCE_UART1, oo_timestamp);
+
   return dipTime;
 }
 
@@ -624,6 +643,7 @@ int do_log(void)
     unsigned char name[13];
     unsigned char inc;
     int temp;
+    uint32_t intTime = 0;
 
 	if(efs_init(&efs, 0) != 0) {
 		return(-1);
@@ -641,6 +661,13 @@ int do_log(void)
     {
 		return(-1);
     }
+
+    // read DIP switches if OO_INTTIME not defined
+    #if OO_INTTIME
+      intTime = OO_INTTIME; 
+    #else
+      intTime = read_dip();
+    #endif
 
     /* write to SD until key is pressed */
     while ((IO0PIN & (1<<LOG_STOP_KEY))>>LOG_STOP_KEY)
@@ -726,17 +753,11 @@ int do_log(void)
           break;
         case OO_INIT:
           Uart1Transmit(OO_INTSET); //set the spectrometer integration time
-          unsigned char timeLow,timeHigh;
-          #if OO_INTTIME
-            unsigned int intTime = OO_INTTIME; //split 16bit int into two 8 bit
-            timeLow = (char)intTime;
-            timeHigh = (char)(intTime >> 8);
-          #else
-            timeHigh = 0x00;
-            timeLow = read_dip();
-          #endif
-          Uart1Transmit(timeHigh);
-          Uart1Transmit(timeLow);
+          //split 32bit int into four 8 bit for UART
+          Uart1Transmit((uint8_t)(intTime >> 24));
+          Uart1Transmit((uint8_t)(intTime >> 16));
+          Uart1Transmit((uint8_t)(intTime >> 8));
+          Uart1Transmit((uint8_t)intTime);
           // transmit_timestamp = getclock();
           oo_init = -1;
           break;
