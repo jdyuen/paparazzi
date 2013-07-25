@@ -242,6 +242,7 @@ void log_pprz(unsigned char c, unsigned char source);
 char log_oo(unsigned char c, unsigned char source);
 int do_log(void);
 int read_dip(void);
+void oo_timeout_msg(unsigned int timestamp);
 
 DirList list;
 EmbeddedFileSystem efs;
@@ -331,14 +332,24 @@ int read_dip(void)
   //save int time to sdcard
   oo_log_buffer[7] = 0xFD;
   oo_log_buffer[8] = 0xFD;
-  oo_log_buffer[9] = (uint8_t)(dipTime >> 24);
-  oo_log_buffer[10] = (uint8_t)(dipTime >> 16);
-  oo_log_buffer[11] = (uint8_t)(dipTime >> 8);
-  oo_log_buffer[12] = (uint8_t)dipTime;
+  oo_log_buffer[9] = 0xAA;
+  oo_log_buffer[10] = (uint8_t)(dipTime >> 24);
+  oo_log_buffer[11] = (uint8_t)(dipTime >> 16);
+  oo_log_buffer[12] = (uint8_t)(dipTime >> 8);
+  oo_log_buffer[13] = (uint8_t)dipTime;
   oo_timestamp = getclock();
-  oo_log_payload(6, LOG_SOURCE_UART1, oo_timestamp);
+  oo_log_payload(7, LOG_SOURCE_UART1, oo_timestamp);
 
   return dipTime;
+}
+
+void oo_timeout_msg(unsigned int timestamp)
+{
+  //save timeout message to sdcard
+  oo_log_buffer[7] = 0xFD;
+  oo_log_buffer[8] = 0xFD;
+  oo_log_buffer[9] = 0xBB;
+  oo_log_payload(3, LOG_SOURCE_UART1, timestamp);
 }
 
 /** Parsing a frame data and copy the payload to the log buffer */
@@ -483,6 +494,7 @@ char log_oo(unsigned char c, unsigned char source)
   static unsigned char oo_status = OO_UNINIT;
   static unsigned int payload_idx, i, oo_chk_total, oo_chksum;
   static unsigned char oo_chk_a, oo_chk_b;
+  unsigned int data_delta = 0;
 
   switch (oo_status) {
   case OO_UNINIT:
@@ -574,6 +586,14 @@ char log_oo(unsigned char c, unsigned char source)
     oo_log_payload(oo_payload_len, source, oo_timestamp);
     LED_TOGGLE(2);
     goto restart;
+  }
+  // Timeout if too long since reciept of data (eg. lost end bits)
+  if (oo_status > OO_GOT_STX) {
+    data_delta = getclock() - oo_timestamp;
+    if (data_delta > 10000) { //10000 = 1second
+      oo_status = OO_FIRST_SAMPLE;
+      oo_timeout_msg(oo_timestamp);
+    }
   }
   return oo_status;
  error:
@@ -799,7 +819,6 @@ int do_log(void)
         //   break;  
         case OO_FIRST_SAMPLE:
           Uart1Transmit(OO_SAMPLE); //tell oo to collect data
-          transmit_timestamp = getclock();
           oo_init = -1;
         case OO_READY_SAMPLE:
           oo_init = -1;
