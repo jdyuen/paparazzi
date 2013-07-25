@@ -268,6 +268,7 @@ unsigned int nb_fail_write = 0;
 int bytes = 0;
 unsigned int clock_msb = 0;
 unsigned int clock_lsb_last = 0;
+static unsigned char oo_status = OO_UNINIT;
 
 void set_filename(unsigned int local, char* name)
 {
@@ -491,10 +492,8 @@ void oo_log_payload(int len, unsigned char source, unsigned int timestamp)
 /* logging an Ocean Optics USB2000+ */
 char log_oo(unsigned char c, unsigned char source)
 {
-  static unsigned char oo_status = OO_UNINIT;
   static unsigned int payload_idx, i, oo_chk_total, oo_chksum;
   static unsigned char oo_chk_a, oo_chk_b;
-  unsigned int data_delta = 0;
 
   switch (oo_status) {
   case OO_UNINIT:
@@ -586,14 +585,6 @@ char log_oo(unsigned char c, unsigned char source)
     oo_log_payload(oo_payload_len, source, oo_timestamp);
     LED_TOGGLE(2);
     goto restart;
-  }
-  // Timeout if too long since reciept of data (eg. lost end bits)
-  if (oo_status > OO_GOT_STX) {
-    data_delta = getclock() - oo_timestamp;
-    if (data_delta > 10000) { //10000 = 1second
-      oo_status = OO_FIRST_SAMPLE;
-      oo_timeout_msg(oo_timestamp);
-    }
   }
   return oo_status;
  error:
@@ -779,7 +770,7 @@ int do_log(void)
           Uart1Transmit((uint8_t)(intTime >> 8));
           Uart1Transmit((uint8_t)intTime);
           // transmit_timestamp = getclock();
-          oo_init = -1;
+          oo_init = -1; //disables case statement until reset by oo_log
           break;
         case OO_GOT_ITIME:
           Uart1Transmit('k'); //enable transmission of spectrum checksum
@@ -820,8 +811,15 @@ int do_log(void)
         case OO_FIRST_SAMPLE:
           Uart1Transmit(OO_SAMPLE); //tell oo to collect data
           oo_init = -1;
-        case OO_READY_SAMPLE:
-          oo_init = -1;
+          break;
+        case OO_SET_TIMESTAMP:
+          // Timeout if too long since reciept of data (eg. lost end bits)
+          transmit_delta = getclock() - oo_timestamp;
+          if (transmit_delta > 10000) { //10000 = 1second
+            oo_init = OO_FIRST_SAMPLE;
+            oo_status = OO_FIRST_SAMPLE;
+            oo_timeout_msg(oo_timestamp);
+          }
         }
   #endif
         temp = 0;
